@@ -1,20 +1,32 @@
 import {
   IPC_CHANNELS,
+  agentEventSchema,
   agentStatusSchema,
   ipcFailureSchema,
   processQuerySchema,
   processesResponseSchema,
+  recentFileSchema,
+  selectedFileSchema,
   systemSummarySchema,
+  watchHandleSchema,
 } from '@deskpulse/contracts';
 import { contextBridge, ipcRenderer } from 'electron';
+import { z } from 'zod';
 
 import type {
+  AgentEvent,
   AgentStatus,
   IpcResult,
   ProcessQuery,
   ProcessesResponse,
+  RecentFile,
+  SelectedFile,
+  StartLogWatchInput,
+  StopLogWatchInput,
   SystemSummary,
+  WatchHandle,
 } from '@deskpulse/contracts';
+import type { IpcRendererEvent } from 'electron';
 import type { ZodType } from 'zod';
 
 /**
@@ -58,10 +70,18 @@ async function invoke<T>(
   };
 }
 
+const selectedFileOrNull = z.union([selectedFileSchema, z.null()]);
+
 export interface DeskPulseTransport {
   getAgentStatus(): Promise<IpcResult<AgentStatus>>;
   getSystemSummary(): Promise<IpcResult<SystemSummary>>;
   getProcesses(query: ProcessQuery): Promise<IpcResult<ProcessesResponse>>;
+  selectLogFile(): Promise<IpcResult<SelectedFile | null>>;
+  getRecentLogFiles(): Promise<IpcResult<RecentFile[]>>;
+  startLogWatch(input: StartLogWatchInput): Promise<IpcResult<WatchHandle>>;
+  stopLogWatch(input: StopLogWatchInput): Promise<IpcResult<void>>;
+  /** Subscribe to forwarded agent events; returns an unsubscribe function. */
+  onAgentEvent(callback: (event: AgentEvent) => void): () => void;
 }
 
 const transport: DeskPulseTransport = {
@@ -82,6 +102,23 @@ const transport: DeskPulseTransport = {
       });
     }
     return invoke(IPC_CHANNELS.systemGetProcesses, processesResponseSchema, parsed.data);
+  },
+  selectLogFile: () => invoke(IPC_CHANNELS.logsSelectFile, selectedFileOrNull),
+  getRecentLogFiles: () => invoke(IPC_CHANNELS.logsRecentFiles, z.array(recentFileSchema)),
+  startLogWatch: (input) => invoke(IPC_CHANNELS.logsStartWatch, watchHandleSchema, input),
+  stopLogWatch: (input) => invoke(IPC_CHANNELS.logsStopWatch, z.void(), input),
+
+  onAgentEvent: (callback) => {
+    const listener = (_event: IpcRendererEvent, payload: unknown): void => {
+      // Validate in the preload too: the renderer only ever sees well-formed
+      // events, even though Main already parsed them.
+      const parsed = agentEventSchema.safeParse(payload);
+      if (parsed.success) {
+        callback(parsed.data);
+      }
+    };
+    ipcRenderer.on(IPC_CHANNELS.event, listener);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.event, listener);
   },
 };
 

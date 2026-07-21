@@ -1,11 +1,17 @@
 import { DeskPulseError } from '@deskpulse/contracts';
 
 import type {
+  AgentEvent,
   AgentStatus,
   IpcResult,
   ProcessQuery,
   ProcessesResponse,
+  RecentFile,
+  SelectedFile,
+  StartLogWatchInput,
+  StopLogWatchInput,
   SystemSummary,
+  WatchHandle,
 } from '@deskpulse/contracts';
 
 /**
@@ -26,4 +32,12 @@ export const api = {
   getSystemSummary: (): Promise<SystemSummary> => unwrap(window.deskPulse.getSystemSummary()),
   getProcesses: (query: ProcessQuery): Promise<ProcessesResponse> =>
     unwrap(window.deskPulse.getProcesses(query)),
+  selectLogFile: (): Promise<SelectedFile | null> => unwrap(window.deskPulse.selectLogFile()),
+  getRecentLogFiles: (): Promise<RecentFile[]> => unwrap(window.deskPulse.getRecentLogFiles()),
+  startLogWatch: (input: StartLogWatchInput): Promise<WatchHandle> =>
+    unwrap(window.deskPulse.startLogWatch(input)),
+  stopLogWatch: (input: StopLogWatchInput): Promise<void> =>
+    unwrap(window.deskPulse.stopLogWatch(input)),
+  onAgentEvent: (callback: (event: AgentEvent) => void): (() => void) =>
+    window.deskPulse.onAgentEvent(callback),
 };

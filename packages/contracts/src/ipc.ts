@@ -13,7 +13,11 @@ export const IPC_CHANNELS = {
   agentGetStatus: 'deskpulse:agent:get-status',
   systemGetSummary: 'deskpulse:system:get-summary',
   systemGetProcesses: 'deskpulse:system:get-processes',
-  /** Single event fan-out channel (Phase 4+). */
+  logsSelectFile: 'deskpulse:logs:select-file',
+  logsStartWatch: 'deskpulse:logs:start-watch',
+  logsStopWatch: 'deskpulse:logs:stop-watch',
+  logsRecentFiles: 'deskpulse:logs:recent-files',
+  /** Single event fan-out channel (agent SSE events, forwarded by Main). */
   event: 'deskpulse:event',
 } as const;
 

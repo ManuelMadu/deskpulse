@@ -54,6 +54,18 @@ export {
   type WatchCreated,
 } from './watch.js';
 export {
+  recentFileSchema,
+  selectedFileSchema,
+  startLogWatchInputSchema,
+  stopLogWatchInputSchema,
+  watchHandleSchema,
+  type RecentFile,
+  type SelectedFile,
+  type StartLogWatchInput,
+  type StopLogWatchInput,
+  type WatchHandle,
+} from './logs-ipc.js';
+export {
   IPC_CHANNELS,
   agentStatusSchema,
   ipcErr,

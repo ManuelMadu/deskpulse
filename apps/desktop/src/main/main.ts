@@ -3,16 +3,21 @@ import path from 'node:path';
 import { BrowserWindow, app } from 'electron';
 
 import { AgentClient } from './agent-client.js';
+import { AgentEventConsumer } from './agent-events.js';
 import { resolveAgentBundlePath } from './agent-paths.js';
 import { AgentSupervisor } from './agent-supervisor.js';
 import { WINDOW_DEFAULTS } from './config.js';
+import { forwardAgentEvent } from './event-bridge.js';
 import { registerIpcHandlers } from './ipc/register.js';
+import { defaultLogLocations } from './log-locations.js';
+import { PathTokenRegistry } from './path-tokens.js';
 
 // Security posture (PDD §30) is set here from day one and never relaxed:
 // sandboxed renderer, context isolation, no Node integration, all navigation
 // and window creation denied except the app's own document.
 
 let supervisor: AgentSupervisor | undefined;
+let eventConsumer: AgentEventConsumer | undefined;
 let isQuitting = false;
 
 function createWindow(): BrowserWindow {
@@ -68,14 +73,24 @@ void app.whenReady().then(() => {
   });
 
   const activeSupervisor = supervisor;
-  const client = new AgentClient(() => {
+  const endpoint = () => {
     const handle = activeSupervisor.currentHandle;
     return handle ? { port: handle.port, token: handle.token } : undefined;
-  });
+  };
+  const client = new AgentClient(endpoint);
+  const tokens = new PathTokenRegistry();
+
+  // Consume the agent's SSE stream once in Main and fan events to renderers.
+  eventConsumer = new AgentEventConsumer(endpoint, forwardAgentEvent, (level, msg, ctx) =>
+    console[level === 'error' ? 'error' : 'log'](`[events] ${msg}`, ctx ?? ''),
+  );
+  eventConsumer.start();
 
   registerIpcHandlers({
     supervisor,
     client,
+    tokens,
+    defaultLogLocations: defaultLogLocations(),
     devServerUrl: MAIN_WINDOW_VITE_DEV_SERVER_URL || undefined,
   });
 
@@ -96,6 +111,7 @@ app.on('before-quit', (event) => {
   }
   event.preventDefault();
   isQuitting = true;
+  eventConsumer?.stop();
   void supervisor
     .stop()
     .catch((error: unknown) => console.error('[supervisor] stop failed', error))

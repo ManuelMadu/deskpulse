@@ -11,10 +11,18 @@ import {
 import { ipcMain } from 'electron';
 import { z } from 'zod';
 
+import {
+  handleRecentFiles,
+  handleSelectFile,
+  handleStartWatch,
+  handleStopWatch,
+  logsInputSchemas,
+} from './logs.js';
 import { isTrustedSenderUrl } from './sender-check.js';
 
 import type { AgentClient } from '../agent-client.js';
 import type { AgentSupervisor } from '../agent-supervisor.js';
+import type { PathTokenRegistry } from '../path-tokens.js';
 import type { AgentStatus, IpcResult } from '@deskpulse/contracts';
 import type { IpcMainInvokeEvent } from 'electron';
 import type { ZodType } from 'zod';
@@ -77,8 +85,16 @@ const noInput = z.undefined();
 export function registerIpcHandlers(deps: {
   supervisor: AgentSupervisor;
   client: AgentClient;
+  tokens: PathTokenRegistry;
+  defaultLogLocations: string[];
   devServerUrl: string | undefined;
 }): void {
+  const logsDeps = {
+    client: deps.client,
+    tokens: deps.tokens,
+    defaultLogLocations: deps.defaultLogLocations,
+  };
+
   handle(IPC_CHANNELS.agentGetStatus, deps.devServerUrl, noInput, (): AgentStatus => {
     const handle = deps.supervisor.currentHandle;
     const status: AgentStatus = { state: deps.supervisor.state };
@@ -98,5 +114,20 @@ export function registerIpcHandlers(deps: {
       `/processes?limit=${query.limit}&sortBy=${query.sortBy}`,
       processesResponseSchema,
     ),
+  );
+
+  handle(IPC_CHANNELS.logsSelectFile, deps.devServerUrl, noInput, handleSelectFile(logsDeps));
+  handle(IPC_CHANNELS.logsRecentFiles, deps.devServerUrl, noInput, handleRecentFiles(logsDeps));
+  handle(
+    IPC_CHANNELS.logsStartWatch,
+    deps.devServerUrl,
+    logsInputSchemas.startWatch,
+    handleStartWatch(logsDeps),
+  );
+  handle(
+    IPC_CHANNELS.logsStopWatch,
+    deps.devServerUrl,
+    logsInputSchemas.stopWatch,
+    handleStopWatch(logsDeps),
   );
 }
