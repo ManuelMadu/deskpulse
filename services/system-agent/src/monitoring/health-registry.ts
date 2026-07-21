@@ -1,9 +1,4 @@
-import {
-  DeskPulseError,
-  ERROR_CODES,
-  LIMITS,
-  monitorConfigInputSchema,
-} from '@deskpulse/contracts';
+import { DeskPulseError, ERROR_CODES, LIMITS } from '@deskpulse/contracts';
 
 import { uuidv7 } from '../uuid.js';
 import { MonitorStateMachine } from './health-state.js';
@@ -260,11 +255,6 @@ export class HealthRegistry {
       });
     }
   }
-}
-
-/** Parse-and-default a raw config for `add` (used by the HTTP route). */
-export function parseMonitorInput(raw: unknown): MonitorConfigInput {
-  return monitorConfigInputSchema.parse(raw);
 }
 
 function cloneStatus(config: MonitorWithStatus): MonitorWithStatus {
