@@ -17,6 +17,10 @@ export const IPC_CHANNELS = {
   logsStartWatch: 'deskpulse:logs:start-watch',
   logsStopWatch: 'deskpulse:logs:stop-watch',
   logsRecentFiles: 'deskpulse:logs:recent-files',
+  monitorsList: 'deskpulse:monitors:list',
+  monitorsAdd: 'deskpulse:monitors:add',
+  monitorsUpdate: 'deskpulse:monitors:update',
+  monitorsRemove: 'deskpulse:monitors:remove',
   /** Single event fan-out channel (agent SSE events, forwarded by Main). */
   event: 'deskpulse:event',
 } as const;

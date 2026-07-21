@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { deskPulseErrorShapeSchema } from './error.js';
+import { probeFailureReasonSchema } from './monitors.js';
 
 /**
  * SSE event payloads (PDD §21). One discriminated union on `type`; the agent
@@ -57,6 +58,33 @@ export const logErrorEventSchema = z.strictObject({
   error: deskPulseErrorShapeSchema,
 });
 
+export const monitorResultEventSchema = z.strictObject({
+  type: z.literal('monitor.result'),
+  monitorId: z.uuid(),
+  at: isoDateTime,
+  ok: z.boolean(),
+  statusCode: z.number().int().optional(),
+  latencyMs: z.number().nonnegative().optional(),
+  reason: probeFailureReasonSchema.optional(),
+});
+
+export const monitorUnhealthyEventSchema = z.strictObject({
+  type: z.literal('monitor.unhealthy'),
+  monitorId: z.uuid(),
+  name: z.string(),
+  at: isoDateTime,
+  consecutiveFailures: z.number().int().positive(),
+  lastReason: probeFailureReasonSchema.optional(),
+});
+
+export const monitorRecoveredEventSchema = z.strictObject({
+  type: z.literal('monitor.recovered'),
+  monitorId: z.uuid(),
+  name: z.string(),
+  at: isoDateTime,
+  downtimeSeconds: z.number().nonnegative(),
+});
+
 export const agentWarningEventSchema = z.strictObject({
   type: z.literal('agent.warning'),
   code: z.string().min(1),
@@ -88,6 +116,9 @@ export const agentEventSchema = z.discriminatedUnion('type', [
   logTruncatedEventSchema,
   logDeletedEventSchema,
   logErrorEventSchema,
+  monitorResultEventSchema,
+  monitorUnhealthyEventSchema,
+  monitorRecoveredEventSchema,
   agentWarningEventSchema,
   agentStatusEventSchema,
   streamResetEventSchema,
