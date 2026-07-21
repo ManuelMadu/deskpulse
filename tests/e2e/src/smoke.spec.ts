@@ -1,5 +1,13 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync } from 'node:fs';
+import {
+  appendFileSync,
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { _electron as electron, expect, test } from '@playwright/test';
@@ -105,4 +113,50 @@ test('packaged app boots sandboxed, supervises the agent, and quits without orph
   }
 
   expect(agentProcessPids(), 'no orphan agent after quit').toEqual([]);
+});
+
+test('flow 2: opening a log file streams appended lines to the viewer', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'deskpulse-e2e-log-'));
+  const logPath = join(dir, 'app.log');
+  writeFileSync(logPath, 'pre-existing line\n');
+
+  const app = await electron.launch({ executablePath: findAppBinary() });
+  try {
+    const window = await app.firstWindow();
+    await expect(window.locator('[data-testid="agent-pill"]')).toContainText('Agent running', {
+      timeout: 15_000,
+    });
+
+    // The native file dialog can't be automated, so stub it to return our
+    // temp file — everything after (token minting, POST /watch, tailing, SSE)
+    // is the real path under test.
+    await app.evaluate(({ dialog }, filePath) => {
+      dialog.showOpenDialog = () =>
+        Promise.resolve({ canceled: false, filePaths: [filePath] } as Awaited<
+          ReturnType<typeof dialog.showOpenDialog>
+        >);
+    }, logPath);
+
+    await window.getByRole('button', { name: 'Logs' }).click();
+    await window.getByRole('button', { name: 'Open a log file…' }).click();
+
+    // The viewer appears once the watch starts (fromEnd, so the pre-existing
+    // line is intentionally not shown).
+    await expect(window.locator('[data-testid="log-view"]')).toBeVisible({ timeout: 15_000 });
+
+    // Append after the watch is live; it must appear (PDD AC: ≤ 1 s; generous
+    // here for CI jitter and the 1 s stat-poll fallback).
+    appendFileSync(logPath, 'streamed-by-flow-2\n');
+    await expect(window.locator('[data-testid="log-view"]')).toContainText('streamed-by-flow-2', {
+      timeout: 5_000,
+    });
+
+    await app.evaluate(({ app: electronApp }) => electronApp.quit());
+    await waitUntil(() => agentProcessPids().length === 0, 10_000, 'agent teardown on quit');
+  } finally {
+    await app.close().catch(() => undefined);
+    rmSync(dir, { recursive: true, force: true });
+  }
+
+  expect(agentProcessPids(), 'no orphan agent after flow 2').toEqual([]);
 });

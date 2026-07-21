@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@deskpulse/contracts": "*",
+    "@tanstack/react-virtual": "^3.14.7",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "undici": "^7.28.0",
