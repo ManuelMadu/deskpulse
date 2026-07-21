@@ -38,6 +38,22 @@ export {
   type ProcessesResponse,
 } from './processes.js';
 export {
+  DROPPABLE_EVENT_TYPES,
+  agentEventSchema,
+  agentStatusEventSchema,
+  logEntryEventSchema,
+  streamResetEventSchema,
+  type AgentEvent,
+  type AgentEventType,
+  type LogEntry,
+} from './events.js';
+export {
+  startWatchRequestSchema,
+  watchCreatedSchema,
+  type StartWatchRequest,
+  type WatchCreated,
+} from './watch.js';
+export {
   IPC_CHANNELS,
   agentStatusSchema,
   ipcErr,

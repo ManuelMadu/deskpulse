@@ -1,0 +1,9 @@
+{
+  "type": "log.entry",
+  "watchId": "018f4e2a-7c3b-7d90-b1a4-9e8d2c5f6a71",
+  "entries": [
+    { "line": "GET /api 200 12ms", "offset": 10486021, "at": "2026-07-21T10:15:02.412Z" }
+  ],
+  "dropped": 0,
+  "truncatedLines": 0
+}
