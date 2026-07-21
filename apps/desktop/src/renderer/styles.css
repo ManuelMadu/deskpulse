@@ -648,3 +648,248 @@ button {
 .mru-item:hover {
   background: var(--bg-inset);
 }
+
+/* ── Monitors screen ───────────────────────────────────────── */
+
+.monitors-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.monitors-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+}
+
+.screen-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.monitors-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.monitors-table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-secondary);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.monitors-table th.num {
+  text-align: right;
+}
+
+.monitors-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid color-mix(in oklch, var(--line) 45%, transparent);
+  vertical-align: middle;
+}
+
+.monitors-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.monitor-name {
+  font-weight: 500;
+}
+
+.monitor-url {
+  color: var(--ink-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  max-width: 22ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.checked {
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-chip .chip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+}
+
+.status-chip[data-tone='ok'] .chip-dot {
+  background: var(--ok);
+}
+.status-chip[data-tone='ok'] {
+  color: var(--ok);
+}
+.status-chip[data-tone='fail'] .chip-dot {
+  background: var(--fail);
+}
+.status-chip[data-tone='fail'] {
+  color: var(--fail);
+}
+.status-chip[data-tone='paused'] .chip-dot {
+  background: var(--warn);
+}
+.status-chip[data-tone='unknown'] {
+  color: var(--ink-secondary);
+}
+
+.sparkline {
+  display: inline-flex;
+  gap: 2px;
+  align-items: flex-end;
+  height: 14px;
+}
+
+.sparkline .tick {
+  width: 3px;
+  height: 12px;
+  border-radius: 1px;
+  background: var(--ink-faint);
+}
+.sparkline .tick.ok {
+  background: color-mix(in oklch, var(--ok) 75%, transparent);
+}
+.sparkline .tick.fail {
+  background: var(--fail);
+}
+
+.row-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.row-actions button {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-secondary);
+}
+.row-actions button:hover {
+  color: var(--ink);
+}
+.row-actions button.danger:hover {
+  color: var(--fail);
+}
+
+.actions-col {
+  text-align: right;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.monitors-empty {
+  max-width: 44ch;
+  margin: 8vh auto 0;
+  text-align: center;
+}
+.monitors-empty .headline {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 6px;
+}
+.monitors-empty .detail {
+  font-size: 13px;
+  color: var(--ink-secondary);
+  margin: 0;
+}
+
+/* Add/edit sheet */
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: oklch(0 0 0 / 0.35);
+  display: grid;
+  place-items: center;
+  z-index: 20;
+}
+
+.sheet {
+  width: 440px;
+  max-width: calc(100vw - 40px);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 12px 40px oklch(0 0 0 / 0.3);
+}
+
+.sheet-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 14px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+  flex: 1;
+}
+
+.field > span {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-secondary);
+}
+
+.field input,
+.field select {
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--bg-inset);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 9px;
+}
+
+.field-row {
+  display: flex;
+  gap: 10px;
+}
+
+.field-error {
+  font-size: 11px;
+  color: var(--fail);
+}
+
+.sheet-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.sheet-actions .primary-action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

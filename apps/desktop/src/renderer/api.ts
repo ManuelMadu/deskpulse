@@ -1,16 +1,20 @@
 import { DeskPulseError } from '@deskpulse/contracts';
 
 import type {
+  AddMonitorInput,
   AgentEvent,
   AgentStatus,
   IpcResult,
+  MonitorWithStatus,
   ProcessQuery,
   ProcessesResponse,
   RecentFile,
+  RemoveMonitorInput,
   SelectedFile,
   StartLogWatchInput,
   StopLogWatchInput,
   SystemSummary,
+  UpdateMonitorInput,
   WatchHandle,
 } from '@deskpulse/contracts';
 
@@ -38,6 +42,13 @@ export const api = {
     unwrap(window.deskPulse.startLogWatch(input)),
   stopLogWatch: (input: StopLogWatchInput): Promise<void> =>
     unwrap(window.deskPulse.stopLogWatch(input)),
+  listMonitors: (): Promise<MonitorWithStatus[]> => unwrap(window.deskPulse.listMonitors()),
+  addMonitor: (input: AddMonitorInput): Promise<MonitorWithStatus> =>
+    unwrap(window.deskPulse.addMonitor(input)),
+  updateMonitor: (input: UpdateMonitorInput): Promise<MonitorWithStatus> =>
+    unwrap(window.deskPulse.updateMonitor(input)),
+  removeMonitor: (input: RemoveMonitorInput): Promise<void> =>
+    unwrap(window.deskPulse.removeMonitor(input)),
   onAgentEvent: (callback: (event: AgentEvent) => void): (() => void) =>
     window.deskPulse.onAgentEvent(callback),
 };

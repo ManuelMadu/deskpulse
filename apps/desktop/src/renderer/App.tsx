@@ -5,19 +5,21 @@ import { Metrics } from './components/Metrics.js';
 import { ProcessTable } from './components/ProcessTable.js';
 import { StatusPill } from './components/StatusPill.js';
 import { LogsScreen } from './components/LogsScreen.js';
+import { MonitorsScreen } from './components/MonitorsScreen.js';
 import { useLogsStore } from './logs-store.js';
+import { useMonitorsStore } from './monitors-store.js';
 import { useDashboardStore } from './store.js';
 import { usePolling } from './use-polling.js';
 
+import type { AgentEvent } from '@deskpulse/contracts';
 import type { ReactElement } from 'react';
 
 const REFRESH_INTERVAL_MS = 2_000; // PDD FR-3
 
-type Screen = 'dashboard' | 'logs';
+type Screen = 'dashboard' | 'logs' | 'monitors';
 
 /** Screens beyond these arrive with their phases (PDD §37). */
 const FUTURE_NAV: { label: string; phase: string }[] = [
-  { label: 'Monitors', phase: '5' },
   { label: 'Diagnostics', phase: '8' },
   { label: 'Settings', phase: '6' },
 ];
@@ -51,15 +53,22 @@ export function App(): ReactElement {
   const [screen, setScreen] = useState<Screen>('dashboard');
   const agent = useDashboardStore((s) => s.agent);
   const refresh = useDashboardStore((s) => s.refresh);
-  const ingest = useLogsStore((s) => s.ingest);
+  const ingestLog = useLogsStore((s) => s.ingest);
+  const ingestMonitor = useMonitorsStore((s) => s.ingest);
 
   // Poll at the shell level so the sidebar agent pill stays live on every
   // screen; the hook pauses entirely while the window is hidden (FR-3).
   usePolling(refresh, REFRESH_INTERVAL_MS);
 
   // One subscription to the forwarded agent event stream (PDD §18): log.*
-  // events flow into the logs store's ring buffers.
-  useEffect(() => api.onAgentEvent(ingest), [ingest]);
+  // events flow into the logs store, monitor.* into the monitors store.
+  useEffect(() => {
+    const route = (event: AgentEvent): void => {
+      ingestLog(event);
+      ingestMonitor(event);
+    };
+    return api.onAgentEvent(route);
+  }, [ingestLog, ingestMonitor]);
 
   return (
     <div className="shell">
@@ -84,6 +93,14 @@ export function App(): ReactElement {
           >
             Logs
           </button>
+          <button
+            type="button"
+            className="nav-item"
+            aria-current={screen === 'monitors' ? 'page' : undefined}
+            onClick={() => setScreen('monitors')}
+          >
+            Monitors
+          </button>
           {FUTURE_NAV.map(({ label, phase }) => (
             <button
               key={label}
@@ -102,7 +119,11 @@ export function App(): ReactElement {
         </div>
       </aside>
 
-      <main className="content">{screen === 'dashboard' ? <Dashboard /> : <LogsScreen />}</main>
+      <main className="content">
+        {screen === 'dashboard' && <Dashboard />}
+        {screen === 'logs' && <LogsScreen />}
+        {screen === 'monitors' && <MonitorsScreen />}
+      </main>
     </div>
   );
 }

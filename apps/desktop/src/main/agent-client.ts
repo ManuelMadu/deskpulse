@@ -27,6 +27,10 @@ export class AgentClient {
     return this.send('POST', path, schema, body);
   }
 
+  patch<T>(path: string, body: unknown, schema: ZodType<T>): Promise<T> {
+    return this.send('PATCH', path, schema, body);
+  }
+
   /** DELETE where the agent replies 204 with no body; 404 is treated as success. */
   async delete(path: string): Promise<void> {
     const endpoint = this.requireEndpoint();
@@ -91,7 +95,7 @@ export class AgentClient {
   }
 
   private async send<T>(
-    method: 'GET' | 'POST',
+    method: 'GET' | 'POST' | 'PATCH',
     path: string,
     schema: ZodType<T>,
     body?: unknown,

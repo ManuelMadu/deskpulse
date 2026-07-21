@@ -18,6 +18,13 @@ import {
   handleStopWatch,
   logsInputSchemas,
 } from './logs.js';
+import {
+  handleAddMonitor,
+  handleListMonitors,
+  handleRemoveMonitor,
+  handleUpdateMonitor,
+  monitorsInputSchemas,
+} from './monitors.js';
 import { isTrustedSenderUrl } from './sender-check.js';
 
 import type { AgentClient } from '../agent-client.js';
@@ -129,5 +136,25 @@ export function registerIpcHandlers(deps: {
     deps.devServerUrl,
     logsInputSchemas.stopWatch,
     handleStopWatch(logsDeps),
+  );
+
+  handle(IPC_CHANNELS.monitorsList, deps.devServerUrl, noInput, handleListMonitors(deps.client));
+  handle(
+    IPC_CHANNELS.monitorsAdd,
+    deps.devServerUrl,
+    monitorsInputSchemas.add,
+    handleAddMonitor(deps.client),
+  );
+  handle(
+    IPC_CHANNELS.monitorsUpdate,
+    deps.devServerUrl,
+    monitorsInputSchemas.update,
+    handleUpdateMonitor(deps.client),
+  );
+  handle(
+    IPC_CHANNELS.monitorsRemove,
+    deps.devServerUrl,
+    monitorsInputSchemas.remove,
+    handleRemoveMonitor(deps.client),
   );
 }

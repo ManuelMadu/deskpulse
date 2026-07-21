@@ -3,6 +3,7 @@ import {
   agentEventSchema,
   agentStatusSchema,
   ipcFailureSchema,
+  monitorWithStatusSchema,
   processQuerySchema,
   processesResponseSchema,
   recentFileSchema,
@@ -14,16 +15,20 @@ import { contextBridge, ipcRenderer } from 'electron';
 import { z } from 'zod';
 
 import type {
+  AddMonitorInput,
   AgentEvent,
   AgentStatus,
   IpcResult,
+  MonitorWithStatus,
   ProcessQuery,
   ProcessesResponse,
   RecentFile,
+  RemoveMonitorInput,
   SelectedFile,
   StartLogWatchInput,
   StopLogWatchInput,
   SystemSummary,
+  UpdateMonitorInput,
   WatchHandle,
 } from '@deskpulse/contracts';
 import type { IpcRendererEvent } from 'electron';
@@ -80,6 +85,10 @@ export interface DeskPulseTransport {
   getRecentLogFiles(): Promise<IpcResult<RecentFile[]>>;
   startLogWatch(input: StartLogWatchInput): Promise<IpcResult<WatchHandle>>;
   stopLogWatch(input: StopLogWatchInput): Promise<IpcResult<void>>;
+  listMonitors(): Promise<IpcResult<MonitorWithStatus[]>>;
+  addMonitor(input: AddMonitorInput): Promise<IpcResult<MonitorWithStatus>>;
+  updateMonitor(input: UpdateMonitorInput): Promise<IpcResult<MonitorWithStatus>>;
+  removeMonitor(input: RemoveMonitorInput): Promise<IpcResult<void>>;
   /** Subscribe to forwarded agent events; returns an unsubscribe function. */
   onAgentEvent(callback: (event: AgentEvent) => void): () => void;
 }
@@ -107,6 +116,10 @@ const transport: DeskPulseTransport = {
   getRecentLogFiles: () => invoke(IPC_CHANNELS.logsRecentFiles, z.array(recentFileSchema)),
   startLogWatch: (input) => invoke(IPC_CHANNELS.logsStartWatch, watchHandleSchema, input),
   stopLogWatch: (input) => invoke(IPC_CHANNELS.logsStopWatch, z.void(), input),
+  listMonitors: () => invoke(IPC_CHANNELS.monitorsList, z.array(monitorWithStatusSchema)),
+  addMonitor: (input) => invoke(IPC_CHANNELS.monitorsAdd, monitorWithStatusSchema, input),
+  updateMonitor: (input) => invoke(IPC_CHANNELS.monitorsUpdate, monitorWithStatusSchema, input),
+  removeMonitor: (input) => invoke(IPC_CHANNELS.monitorsRemove, z.void(), input),
 
   onAgentEvent: (callback) => {
     const listener = (_event: IpcRendererEvent, payload: unknown): void => {
