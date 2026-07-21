@@ -76,18 +76,22 @@ test('packaged app boots sandboxed, supervises the agent, and quits without orph
       deskPulse: 'object',
     });
 
-    // The IPC slice works end to end: the renderer's status line reaches
-    // "running" with the real agent pid via preload → Main → supervisor.
-    await expect(window.locator('#agent-status')).toContainText('Agent: running', {
+    // The IPC slice works end to end: the sidebar pill reaches "running"
+    // with the real agent pid via preload → Main → supervisor.
+    await expect(window.locator('[data-testid="agent-pill"]')).toContainText('Agent running', {
       timeout: 15_000,
     });
 
     // Live metrics flow the full path: agent sampler → /system → AgentClient
-    // → IPC → renderer (DP-9).
-    await expect(window.locator('#system-status')).toContainText('CPU', { timeout: 15_000 });
+    // → IPC → Dashboard (DP-9); the big numeral shows a real percentage.
+    await expect(window.locator('[data-testid="cpu-overall"]')).toContainText('%', {
+      timeout: 15_000,
+    });
 
-    // Process list flows through the validated-input IPC handler (DP-10).
-    await expect(window.locator('#top-process')).toContainText('% CPU', { timeout: 15_000 });
+    // Process table flows through the validated-input IPC handler (DP-10).
+    await expect(window.locator('[data-testid="process-row"]').first()).toContainText('%', {
+      timeout: 15_000,
+    });
 
     // The agent runs as a separate OS process (spawned from Resources/agent.cjs).
     await waitUntil(() => agentProcessPids().length === 1, 15_000, 'agent child process');

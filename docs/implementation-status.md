@@ -25,9 +25,11 @@ until the GitHub remote exists (see Blocked items).
 | DP-9   | Metrics sampler + `/system`: pure `computeCpuPercents` over `os.cpus()` tick deltas (clamped ≥ 0 for sleep/wake jumps, 0 % on zero delta, capped at 100 %), `MetricsSampler` with cached 2 s samples and timer teardown owned by the agent's close path, `GET /system` with 503 `NOT_READY` before the first sample                                                                                                                                                                             | 7 unit tests from fixture tick tables (incl. backwards-counter clamp, core-count change), sampler start/stop tests, integration: NOT_READY → contract-valid 200 transition + auth required; packaged E2E asserts live CPU text reaches the renderer (8.2 s)     |
 | DP-10  | `ps` process adapter + `/processes`: `execFile('/bin/ps', ['-axo','pid=,pcpu=,rss=,comm='])` — the agent's only child process, fixed binary + array args; parser tolerating comm values with spaces/parentheses, RSS KiB→bytes, per-process CPU > 100 % allowed; 2 s cache sharing one in-flight `ps` across concurrent calls; query validation (limit 1–50, sortBy cpu\|memory, unknown params rejected); first input-validated IPC handler + preload sanity parse + renderer top-process line | 11 new tests: gnarly-comm parser fixtures, sort/limit, cache single-invocation + expiry, integration against real `/bin/ps` (contract-valid, ordering, full invalid-query matrix → 400 envelopes, auth); packaged E2E asserts top-process text end-to-end       |
 
+| P3-UI | Dashboard UI: React 19 + Zustand + hand-rolled visibility-aware `usePolling` (2 s, zero traffic while hidden, FR-3); sidebar shell with phase-tagged future nav + agent status pill (dot + words, never color alone); CPU big numeral + per-core threshold-tinted bars, memory bar with "approx. used" caveat, host facts; server-sorted process table (CPU/Memory headers, `aria-sort`); honest NOT_READY/error/retry states; design system in PRODUCT.md/DESIGN.md (OKLCH amber-tinted neutrals, light+dark via system, reduced-motion respected) | 8 formatter/threshold unit tests; full gate sweep (94 tests); packaged E2E: pill reaches "Agent running", CPU numeral %, process rows render, no orphans (8.8 s) |
+
 ## Active ticket
 
-**Phase 3 Dashboard UI** (first ten tickets complete): React 18 + Zustand stores, visibility-aware polling hooks (FR-3), CPU gauge + per-core bars, memory bar, top-processes table sortable by CPU/memory, agent status pill.
+**Phase 3 wrap-up → M2**: manual sanity vs Activity Monitor, then Phase 4 (log watching — the project's centerpiece).
 
 ## Blocked items
 
@@ -63,6 +65,11 @@ Resolved so far:
   unchanged; validation still happens in preload.
 - `npm audit`: 0 vulnerabilities in production deps; 25 advisories exist in dev-only
   toolchain chains (Forge → tar/inquirer). Revisit on Forge upgrades.
+- **React 19** (PDD §18 says "React 18", written pre-19-stable): all planned deps
+  (zustand 5, @tanstack/react-virtual) support 19; `@vitejs/plugin-react` pinned to 5.x
+  (6.x needs Vite 8). Root `vite` pinned ~7.3.6 so one Vite serves Vitest and Forge.
+- Design context lives in `PRODUCT.md` + `DESIGN.md` (impeccable skill); OD-9 resolved:
+  hand-rolled `usePolling`, no TanStack Query.
 
 ## Phase acceptance results
 

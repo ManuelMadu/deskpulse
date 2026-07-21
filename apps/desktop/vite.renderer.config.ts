@@ -1,3 +1,4 @@
+import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
 import type { Plugin } from 'vite';
@@ -23,5 +24,5 @@ function injectCsp(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [injectCsp()],
+  plugins: [react(), injectCsp()],
 });
