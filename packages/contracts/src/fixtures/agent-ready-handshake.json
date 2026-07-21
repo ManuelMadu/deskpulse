@@ -1,0 +1,6 @@
+{
+  "type": "deskpulse-agent-ready",
+  "port": 52814,
+  "pid": 4321,
+  "version": "0.1.0"
+}

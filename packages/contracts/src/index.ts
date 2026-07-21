@@ -24,3 +24,8 @@ export {
   type HealthResponse,
   type SystemSummary,
 } from './http.js';
+export {
+  AGENT_EXIT_CODES,
+  agentReadyHandshakeSchema,
+  type AgentReadyHandshake,
+} from './handshake.js';

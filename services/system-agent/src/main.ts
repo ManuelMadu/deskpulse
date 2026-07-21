@@ -1,24 +1,34 @@
 /**
- * Executable entry bundled to dist/agent.cjs. DP-6 adds the formal readiness
- * handshake schema, SIGTERM shutdown, exit-code conventions, and pino logging.
+ * Executable entry bundled to dist/agent.cjs and spawned by the supervisor
+ * with ELECTRON_RUN_AS_NODE=1. Startup order matters: token check (exit 78)
+ * → logging → server (exit 71 on bind failure) → handshake → signal handlers.
  */
-import { startAgent } from './agent.js';
-
-const EXIT_NO_TOKEN = 78; // EX_CONFIG — spawned without DESKPULSE_AGENT_TOKEN
+import { AGENT_VERSION, startAgent } from './agent.js';
+import { AGENT_EXIT_CODES, installLifecycleHandlers, printReadyHandshake } from './lifecycle.js';
+import { createAgentLogging } from './logging.js';
 
 const token = process.env['DESKPULSE_AGENT_TOKEN'];
 if (token === undefined || token.length === 0) {
   process.stderr.write('DESKPULSE_AGENT_TOKEN is not set; refusing to start.\n');
-  process.exit(EXIT_NO_TOKEN);
+  process.exit(AGENT_EXIT_CODES.noToken);
 }
 
-startAgent({ token })
-  .then(({ port }) => {
-    process.stdout.write(
-      `${JSON.stringify({ type: 'deskpulse-agent-ready', port, pid: process.pid, version: '0.1.0' })}\n`,
-    );
+const logging = createAgentLogging();
+logging.logger.info({ subsystem: 'lifecycle', version: AGENT_VERSION }, 'agent starting');
+
+startAgent({
+  token,
+  onError: (error) =>
+    logging.logger.error({ subsystem: 'http', err: String(error) }, 'route handler error'),
+})
+  .then((server) => {
+    installLifecycleHandlers(server, logging);
+    printReadyHandshake(server.port, AGENT_VERSION);
+    logging.logger.info({ subsystem: 'lifecycle', port: server.port }, 'agent ready');
   })
   .catch((error: unknown) => {
+    logging.logger.fatal({ subsystem: 'lifecycle', err: String(error) }, 'listen failed');
+    logging.close();
     process.stderr.write(`agent failed to start: ${String(error)}\n`);
-    process.exit(71); // EX_OSERR — listen/bind failure
+    process.exit(AGENT_EXIT_CODES.listenFailure);
   });
