@@ -1,0 +1,10 @@
+{
+  "error": {
+    "code": "VALIDATION_FAILED",
+    "message": "Request body failed validation.",
+    "details": {
+      "issues": [{ "path": "intervalSeconds", "message": "must be between 5 and 3600" }]
+    },
+    "retryable": false
+  }
+}

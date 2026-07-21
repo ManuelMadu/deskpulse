@@ -17,9 +17,11 @@ GitHub remote exists (see Blocked items).
 | DP-2   | CI pipeline: `ci.yml` on `macos-latest` (lint → depcruise → format → typecheck → agent bundle → tests), dependency-cruiser config enforcing §35 (incl. `no-unresolvable` so a missing exports map can't hide a forbidden edge), commented `windows-latest` placeholder    | `npm run depcruise` + every ci.yml step run locally; rules probed with deliberate violations                                                    |
 | DP-3   | Electron Forge + Vite shell: locked-down BrowserWindow (`sandbox`, `contextIsolation`, no `nodeIntegration`, window-open denied, navigation locked), CSP injected into built index.html, ZIP+DMG makers, fuses locked except `RunAsNode` (needed for the agent, ADR-0001) | `npm start` smoke test (Electron boots, clean teardown, 0 leftover procs); `npm run make` → DeskPulse-0.1.0 ZIP+DMG; CSP verified in built HTML |
 
+| DP-4 | Contracts v0: 19 stable error codes + HTTP status map, error envelope schema + `DeskPulseError` class, strict `/health` and `/system` schemas, limits, PDD payloads as JSON fixtures, 18 contract tests (round-trips, unknown-field rejection at every nesting level, edge values) | `npm test -w @deskpulse/contracts` (18 tests), typecheck, lint, depcruise |
+
 ## Active ticket
 
-**DP-4 — Contracts v0** (Phase 1): error envelope + codes, `/health` and `/system` schemas, limits/constants, fixtures dir, contract tests incl. unknown-field rejection.
+**DP-5 — Agent HTTP bootstrap**: `node:http` server on `127.0.0.1:0`, micro-router, bearer auth middleware (env token, timingSafeEqual), error serializer, `GET /health`; integration tests: 401/200, loopback-only.
 
 ## Blocked items
 

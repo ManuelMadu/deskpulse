@@ -9,16 +9,18 @@
 
 export const CONTRACTS_VERSION = '0.1.0' as const;
 
-/** Hard limits shared by agent, main, and renderer (PDD FR-7/FR-8, §20, §21). */
-export const LIMITS = {
-  maxLogWatches: 5,
-  maxMonitors: 20,
-  maxLineLengthBytes: 32 * 1024,
-  maxRequestBodyBytes: 64 * 1024,
-  maxLogEntriesPerSecondPerWatch: 500,
-  rendererLogRingBufferLines: 5_000,
-  sseReplayBufferEvents: 500,
-  maxSseConnections: 2,
-} as const;
-
-export type Limits = typeof LIMITS;
+export { LIMITS, type Limits } from './limits.js';
+export { ERROR_CODES, ERROR_HTTP_STATUS, type ErrorCode } from './error-codes.js';
+export {
+  DeskPulseError,
+  deskPulseErrorShapeSchema,
+  errorEnvelopeSchema,
+  type DeskPulseErrorShape,
+  type ErrorEnvelope,
+} from './error.js';
+export {
+  healthResponseSchema,
+  systemSummarySchema,
+  type HealthResponse,
+  type SystemSummary,
+} from './http.js';
