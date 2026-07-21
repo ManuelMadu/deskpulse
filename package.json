@@ -16,14 +16,16 @@
   ],
   "scripts": {
     "start": "npm run start -w @deskpulse/desktop",
-    "make": "npm run make -w @deskpulse/desktop",
+    "make": "npm run build -w @deskpulse/system-agent && npm run make -w @deskpulse/desktop",
     "build": "tsc -b",
     "typecheck": "tsc -b --pretty",
     "test": "tsc -b && npm run test --workspaces --if-present",
     "lint": "eslint .",
     "depcruise": "depcruise --config .dependency-cruiser.cjs packages/contracts/src services/system-agent/src apps/desktop/src tests/e2e/src",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "package": "npm run build -w @deskpulse/system-agent && npm run package -w @deskpulse/desktop",
+    "test:e2e": "npm run package && npm run e2e -w @deskpulse/e2e"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

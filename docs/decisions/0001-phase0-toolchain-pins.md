@@ -27,10 +27,17 @@ Option 2:
   sketch adjusted): Forge resolves `electron` and the Vite configs relative to
   the package it runs in; root `npm start`/`npm run make` delegate via
   `npm -w @deskpulse/desktop`.
-- **Fuses: `RunAsNode` stays enabled** — the Forge template disables it, but the
-  agent strategy (PDD OD-1) launches the bundled agent with
-  `ELECTRON_RUN_AS_NODE=1`. All other fuses keep the template's locked values.
-  Final OD-1 sign-off still requires the packaged-build spike (end of Phase 2).
+- **Fuses: `RunAsNode` and `EnableNodeCliInspectArguments` stay enabled** — the
+  Forge template disables both. `RunAsNode` is required by the agent strategy
+  (PDD OD-1): the supervisor launches the bundled agent with
+  `ELECTRON_RUN_AS_NODE=1`. `EnableNodeCliInspectArguments` is required by
+  Playwright's Electron driver (`--inspect=0`); with it disabled,
+  `electron.launch` hangs forever against the packaged app (observed
+  2026-07-21). Since `RunAsNode` already concedes arbitrary Node execution to
+  a same-user process — and §30 excludes that adversary — enabling inspect
+  args adds no marginal risk. All other fuses keep the template's locked
+  values. **OD-1 validated**: the packaged app spawns `Resources/agent.cjs`
+  via `ELECTRON_RUN_AS_NODE` (verified in the Phase 2 packaged E2E smoke).
 
 ## Consequences
 

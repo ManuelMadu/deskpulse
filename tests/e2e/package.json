@@ -5,6 +5,10 @@
   "description": "Playwright Electron end-to-end suite (5 flows) plus fixture health server. Runs against the built app only.",
   "type": "module",
   "scripts": {
-    "test": "vitest run --dir src"
+    "test": "vitest run",
+    "e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
   }
 }

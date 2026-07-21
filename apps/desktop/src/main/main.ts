@@ -2,11 +2,16 @@ import path from 'node:path';
 
 import { BrowserWindow, app } from 'electron';
 
+import { resolveAgentBundlePath } from './agent-paths.js';
+import { AgentSupervisor } from './agent-supervisor.js';
 import { WINDOW_DEFAULTS } from './config.js';
 
 // Security posture (PDD §30) is set here from day one and never relaxed:
 // sandboxed renderer, context isolation, no Node integration, all navigation
 // and window creation denied except the app's own document.
+
+let supervisor: AgentSupervisor | undefined;
+let isQuitting = false;
 
 function createWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -44,6 +49,22 @@ app.on('web-contents-created', (_event, contents) => {
 });
 
 void app.whenReady().then(() => {
+  supervisor = new AgentSupervisor({
+    bundlePath: resolveAgentBundlePath(),
+    execPath: process.execPath,
+    log: (level, msg, ctx) => {
+      // Pino-backed main logging arrives in Phase 2's logging ticket; until
+      // then supervisor events go to the terminal in dev.
+      console[level === 'error' ? 'error' : 'log'](`[supervisor] ${msg}`, ctx ?? '');
+    },
+  });
+
+  supervisor.start().catch((error: unknown) => {
+    // Happy-path ticket: a failed start is logged and surfaced later via
+    // AgentStatus (DP-8); restart/backoff behavior is Phase 7 (PDD §28).
+    console.error('[supervisor] agent failed to start', error);
+  });
+
   createWindow();
 
   app.on('activate', () => {
@@ -51,6 +72,20 @@ void app.whenReady().then(() => {
       createWindow();
     }
   });
+});
+
+app.on('before-quit', (event) => {
+  // Quit orchestration (PDD §13/FR-17): stop the agent before exiting so a
+  // packaged quit never leaves an orphan. preventDefault once, stop, re-quit.
+  if (isQuitting || !supervisor || supervisor.state === 'stopped') {
+    return;
+  }
+  event.preventDefault();
+  isQuitting = true;
+  void supervisor
+    .stop()
+    .catch((error: unknown) => console.error('[supervisor] stop failed', error))
+    .finally(() => app.quit());
 });
 
 app.on('window-all-closed', () => {

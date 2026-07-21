@@ -12,10 +12,11 @@ const config: ForgeConfig = {
     appBundleId: 'com.manuelmadubugini.deskpulse',
     appCategoryType: 'public.app-category.developer-tools',
     asar: true,
-    // Phase 2 adds extraResource: the esbuild agent bundle
-    // (services/system-agent/dist/agent.cjs), resolved at runtime via
-    // process.resourcesPath. Signing/notarization stays behind env-controlled
-    // config until a paid Apple Developer account exists (PDD §34).
+    // The agent ships as a standalone bundle next to the app resources and is
+    // spawned with ELECTRON_RUN_AS_NODE — never imported (PDD §34, §35).
+    // Signing/notarization stays behind env-controlled config until a paid
+    // Apple Developer account exists (PDD §34).
+    extraResource: ['../../services/system-agent/dist/agent.cjs'],
   },
   rebuildConfig: {},
   makers: [new MakerZIP({}, ['darwin']), new MakerDMG({}, ['darwin'])],
@@ -29,13 +30,18 @@ const config: ForgeConfig = {
     }),
     new FusesPlugin({
       version: FuseVersion.V1,
-      // RunAsNode stays ENABLED — deliberately diverging from the Forge
-      // template: the supervisor launches the bundled system agent with
-      // ELECTRON_RUN_AS_NODE=1 (PDD §28, OD-1). Every other fuse is locked.
+      // Two fuses stay ENABLED, deliberately diverging from the Forge template
+      // (rationale in ADR-0001):
+      // - RunAsNode: the supervisor launches the bundled system agent with
+      //   ELECTRON_RUN_AS_NODE=1 (PDD §28, OD-1).
+      // - NodeCliInspectArguments: Playwright's Electron driver attaches via
+      //   --inspect=0; disabling it hangs E2E against the packaged app. With
+      //   RunAsNode already enabled this concedes nothing extra to same-user
+      //   processes, which the PDD §30 threat model excludes regardless.
       [FuseV1Options.RunAsNode]: true,
       [FuseV1Options.EnableCookieEncryption]: true,
       [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
-      [FuseV1Options.EnableNodeCliInspectArguments]: false,
+      [FuseV1Options.EnableNodeCliInspectArguments]: true,
       [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
       [FuseV1Options.OnlyLoadAppFromAsar]: true,
     }),
