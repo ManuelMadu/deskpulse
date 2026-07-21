@@ -1,0 +1,14 @@
+{
+  "name": "@deskpulse/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Electron shell: sandboxed renderer, contextBridge preload, main process owning windows, tray, dialogs, notifications, persistence, and agent supervision.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run --dir src"
+  },
+  "dependencies": {
+    "@deskpulse/contracts": "*"
+  }
+}

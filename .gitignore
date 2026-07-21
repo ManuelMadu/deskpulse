@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+out/
+.vite/
+*.tsbuildinfo
+
+# Test artifacts
+coverage/
+playwright-report/
+test-results/
+
+# Packaging / signing — never commit artifacts or credentials
+*.dmg
+*.zip
+*.p12
+*.provisionprofile
+.env
+.env.*
+
+# Diagnostic exports
+deskpulse-diagnostics-*.zip
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Logs
+*.log

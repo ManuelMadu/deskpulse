@@ -1,0 +1,35 @@
+{
+  "name": "deskpulse",
+  "version": "0.1.0",
+  "private": true,
+  "description": "macOS menu-bar system diagnostics: live metrics, rotation-safe log tailing, local service health checks, and diagnostic export — Electron shell supervising a standalone Node.js agent.",
+  "author": "Manuel Madubugini <manuelmadubugini@gmail.com>",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "packages/contracts",
+    "services/system-agent",
+    "apps/desktop",
+    "tests/e2e"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b --pretty",
+    "test": "tsc -b && npm run test --workspaces --if-present",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "@types/node": "^24.0.0",
+    "eslint": "^10.7.0",
+    "globals": "^16.0.0",
+    "prettier": "^3.9.5",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.65.0",
+    "vitest": "^4.1.10"
+  }
+}

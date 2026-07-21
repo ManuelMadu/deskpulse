@@ -1,0 +1,10 @@
+{
+  "name": "@deskpulse/e2e",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Playwright Electron end-to-end suite (5 flows) plus fixture health server. Runs against the built app only.",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run --dir src"
+  }
+}

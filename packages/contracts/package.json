@@ -1,0 +1,22 @@
+{
+  "name": "@deskpulse/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared cross-process contracts: Zod schemas, inferred types, error codes, and limits. Runtime-pure \u2014 no Electron, no Node built-ins.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run --dir src"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  }
+}
