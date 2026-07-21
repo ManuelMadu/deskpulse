@@ -2,11 +2,11 @@
   "name": "@deskpulse/system-agent",
   "version": "0.1.0",
   "private": true,
-  "description": "Standalone Node.js system agent: metrics sampling, log tailing, health probes, SSE event stream, diagnostics export. No Electron dependency \u2014 ever.",
+  "description": "Standalone Node.js system agent: metrics sampling, log tailing, health probes, SSE event stream, diagnostics export. No Electron dependency — ever.",
   "type": "module",
   "scripts": {
     "build": "tsc -b && node esbuild.config.mjs",
-    "test": "vitest run --dir src"
+    "test": "vitest run"
   },
   "dependencies": {
     "@deskpulse/contracts": "*"
