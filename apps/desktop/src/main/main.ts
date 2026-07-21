@@ -2,9 +2,11 @@ import path from 'node:path';
 
 import { BrowserWindow, app } from 'electron';
 
+import { AgentClient } from './agent-client.js';
 import { resolveAgentBundlePath } from './agent-paths.js';
 import { AgentSupervisor } from './agent-supervisor.js';
 import { WINDOW_DEFAULTS } from './config.js';
+import { registerIpcHandlers } from './ipc/register.js';
 
 // Security posture (PDD §30) is set here from day one and never relaxed:
 // sandboxed renderer, context isolation, no Node integration, all navigation
@@ -60,9 +62,21 @@ void app.whenReady().then(() => {
   });
 
   supervisor.start().catch((error: unknown) => {
-    // Happy-path ticket: a failed start is logged and surfaced later via
-    // AgentStatus (DP-8); restart/backoff behavior is Phase 7 (PDD §28).
+    // Happy-path ticket: a failed start is logged and surfaced via
+    // getAgentStatus; restart/backoff behavior is Phase 7 (PDD §28).
     console.error('[supervisor] agent failed to start', error);
+  });
+
+  const activeSupervisor = supervisor;
+  const client = new AgentClient(() => {
+    const handle = activeSupervisor.currentHandle;
+    return handle ? { port: handle.port, token: handle.token } : undefined;
+  });
+
+  registerIpcHandlers({
+    supervisor,
+    client,
+    devServerUrl: MAIN_WINDOW_VITE_DEV_SERVER_URL || undefined,
   });
 
   createWindow();

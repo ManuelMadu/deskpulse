@@ -59,13 +59,28 @@ test('packaged app boots sandboxed, supervises the agent, and quits without orph
     const window = await app.firstWindow();
     await expect(window.locator('h1')).toHaveText('DeskPulse');
 
-    // Renderer lockdown: sandboxed, no Node globals, no Electron internals.
+    // Renderer lockdown: sandboxed, no Node globals, no Electron internals —
+    // and the preload exposes exactly the frozen narrow surface, never ipcRenderer.
     const globals = await window.evaluate(() => ({
       process: typeof (globalThis as Record<string, unknown>)['process'],
       require: typeof (globalThis as Record<string, unknown>)['require'],
       Buffer: typeof (globalThis as Record<string, unknown>)['Buffer'],
+      ipcRenderer: typeof (globalThis as Record<string, unknown>)['ipcRenderer'],
+      deskPulse: typeof (globalThis as Record<string, unknown>)['deskPulse'],
     }));
-    expect(globals).toEqual({ process: 'undefined', require: 'undefined', Buffer: 'undefined' });
+    expect(globals).toEqual({
+      process: 'undefined',
+      require: 'undefined',
+      Buffer: 'undefined',
+      ipcRenderer: 'undefined',
+      deskPulse: 'object',
+    });
+
+    // The IPC slice works end to end: the renderer's status line reaches
+    // "running" with the real agent pid via preload → Main → supervisor.
+    await expect(window.locator('#agent-status')).toContainText('Agent: running', {
+      timeout: 15_000,
+    });
 
     // The agent runs as a separate OS process (spawned from Resources/agent.cjs).
     await waitUntil(() => agentProcessPids().length === 1, 15_000, 'agent child process');

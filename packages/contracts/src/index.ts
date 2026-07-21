@@ -29,3 +29,13 @@ export {
   agentReadyHandshakeSchema,
   type AgentReadyHandshake,
 } from './handshake.js';
+export {
+  IPC_CHANNELS,
+  agentStatusSchema,
+  ipcErr,
+  ipcFailureSchema,
+  ipcOk,
+  type AgentStatus,
+  type IpcChannel,
+  type IpcResult,
+} from './ipc.js';
