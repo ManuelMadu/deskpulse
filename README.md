@@ -41,7 +41,7 @@ npm test            # typecheck + all workspace test suites
 npm run lint
 ```
 
-`npm start` (dev app) arrives with the Electron Forge shell (ticket DP-3).
+`npm start` opens the dev app (Vite HMR renderer). `npm run make` produces unsigned ZIP+DMG artifacts in `apps/desktop/out/make/`.
 
 ## Repository layout
 

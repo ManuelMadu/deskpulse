@@ -5,18 +5,21 @@ where the build actually is.
 
 ## Current phase
 
-**Phase 0 — Repository and tooling setup** (PDD §37)
+**Phase 1 — Shared contracts and agent bootstrap** (PDD §37).
+Phase 0 complete locally; its "CI green on PR" criterion remains outstanding until the
+GitHub remote exists (see Blocked items).
 
 ## Completed tickets
 
-| Ticket | Summary                                                                                                                                                                                                                                    | Verified by                                               |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
-| DP-1   | Monorepo scaffold: npm workspaces (contracts, system-agent, desktop, e2e), strict TS with project references, ESLint 10 flat config with dependency walls, Prettier, one passing Vitest suite per workspace, esbuild agent bundle skeleton | `npm ci && npm run typecheck && npm test && npm run lint` |
-| DP-2   | CI pipeline: `ci.yml` on `macos-latest` (lint → depcruise → format → typecheck → agent bundle → tests), dependency-cruiser config enforcing §35 (incl. `no-unresolvable` so a missing exports map can't hide a forbidden edge), commented `windows-latest` placeholder | `npm run depcruise` + every ci.yml step run locally; rules probed with deliberate violations |
+| Ticket | Summary                                                                                                                                                                                                                                                                   | Verified by                                                                                                                                     |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| DP-1   | Monorepo scaffold: npm workspaces (contracts, system-agent, desktop, e2e), strict TS with project references, ESLint 10 flat config with dependency walls, Prettier, one passing Vitest suite per workspace, esbuild agent bundle skeleton                                | `npm ci && npm run typecheck && npm test && npm run lint`                                                                                       |
+| DP-2   | CI pipeline: `ci.yml` on `macos-latest` (lint → depcruise → format → typecheck → agent bundle → tests), dependency-cruiser config enforcing §35 (incl. `no-unresolvable` so a missing exports map can't hide a forbidden edge), commented `windows-latest` placeholder    | `npm run depcruise` + every ci.yml step run locally; rules probed with deliberate violations                                                    |
+| DP-3   | Electron Forge + Vite shell: locked-down BrowserWindow (`sandbox`, `contextIsolation`, no `nodeIntegration`, window-open denied, navigation locked), CSP injected into built index.html, ZIP+DMG makers, fuses locked except `RunAsNode` (needed for the agent, ADR-0001) | `npm start` smoke test (Electron boots, clean teardown, 0 leftover procs); `npm run make` → DeskPulse-0.1.0 ZIP+DMG; CSP verified in built HTML |
 
 ## Active ticket
 
-**DP-3 — Electron Forge + Vite shell**: hello-world window with `sandbox:true`, `contextIsolation:true`, CSP, navigation lock; `npm start` and `npm run make` both work.
+**DP-4 — Contracts v0** (Phase 1): error envelope + codes, `/health` and `/system` schemas, limits/constants, fixtures dir, contract tests incl. unknown-field rejection.
 
 ## Blocked items
 
@@ -27,8 +30,10 @@ where the build actually is.
 ## Deferred work
 
 - Playwright Electron E2E harness (Phase 2+; `tests/e2e` currently holds a Vitest placeholder).
-- Forge + Vite integration (DP-3).
-- Universal (arm64+x64) builds — per-arch acceptable for MVP (PDD §34).
+- Universal (arm64+x64) builds — per-arch acceptable for MVP (PDD §34). Dev machine is
+  Intel (x64); arm64 artifacts need CI or another machine.
+- plugin-vite deprecation warning (`inlineDynamicImports` vs `codeSplitting`) on Vite 7 —
+  cosmetic, revisit on the next Forge upgrade.
 
 ## Open technical decisions
 
@@ -50,7 +55,8 @@ Phase 0 "done when": fresh clone → `npm ci && npm test && npm start` works; CI
 - `npm run typecheck` ✅ (tsc -b, all 4 workspaces)
 - `npm test` ✅ (4 suites, 6 tests)
 - `npm run lint` ✅ (walls verified with deliberate violations)
-- `npm start` ⏳ arrives with DP-3 (Forge + Vite shell)
+- `npm start` ✅ (Electron boots the locked-down shell; clean teardown, no orphan processes)
+- `npm run make` ✅ (unsigned ZIP + DMG for darwin/x64; CSP present in built index.html)
 - CI green ⏳ DP-2 authored, remote push pending `workflow` scope
 
 ## Commands used to verify
