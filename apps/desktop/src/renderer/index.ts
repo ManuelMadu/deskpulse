@@ -10,7 +10,7 @@ import { api } from './api.js';
 
 const root = document.getElementById('app');
 
-function render(agentLine: string, systemLine: string): void {
+function render(agentLine: string, systemLine: string, processLine: string): void {
   if (!root) {
     return;
   }
@@ -26,10 +26,15 @@ function render(agentLine: string, systemLine: string): void {
   systemStatus.id = 'system-status';
   systemStatus.textContent = systemLine;
 
-  root.append(heading, agentStatus, systemStatus);
+  const topProcess = document.createElement('p');
+  topProcess.id = 'top-process';
+  topProcess.textContent = processLine;
+
+  root.append(heading, agentStatus, systemStatus, topProcess);
 }
 
 let lastSystemLine = 'Metrics: waiting for agent…';
+let lastProcessLine = 'Top process: waiting…';
 
 async function refresh(): Promise<void> {
   let agentLine: string;
@@ -44,14 +49,26 @@ async function refresh(): Promise<void> {
     const summary = await api.getSystemSummary();
     lastSystemLine = `CPU ${summary.cpu.overallPercent.toFixed(1)}% · ${summary.cpu.perCorePercent.length} cores`;
   } catch (error) {
-    // /system lands with DP-9; until then the typed error path is the demo.
     lastSystemLine =
       error instanceof DeskPulseError
         ? `Metrics: not available yet (${error.code})`
         : `Metrics: ${String(error)}`;
   }
 
-  render(agentLine, lastSystemLine);
+  try {
+    const { processes } = await api.getProcesses({ limit: 1, sortBy: 'cpu' });
+    const top = processes[0];
+    lastProcessLine = top
+      ? `Top process: ${top.name} — ${top.cpuPercent.toFixed(1)}% CPU`
+      : 'Top process: none reported';
+  } catch (error) {
+    lastProcessLine =
+      error instanceof DeskPulseError
+        ? `Top process: unavailable (${error.code})`
+        : `Top process: ${String(error)}`;
+  }
+
+  render(agentLine, lastSystemLine, lastProcessLine);
 }
 
 void refresh();

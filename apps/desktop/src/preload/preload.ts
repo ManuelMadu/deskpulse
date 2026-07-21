@@ -2,11 +2,19 @@ import {
   IPC_CHANNELS,
   agentStatusSchema,
   ipcFailureSchema,
+  processQuerySchema,
+  processesResponseSchema,
   systemSummarySchema,
 } from '@deskpulse/contracts';
 import { contextBridge, ipcRenderer } from 'electron';
 
-import type { AgentStatus, IpcResult, SystemSummary } from '@deskpulse/contracts';
+import type {
+  AgentStatus,
+  IpcResult,
+  ProcessQuery,
+  ProcessesResponse,
+  SystemSummary,
+} from '@deskpulse/contracts';
 import type { ZodType } from 'zod';
 
 /**
@@ -20,8 +28,15 @@ import type { ZodType } from 'zod';
  * renderer's api wrapper converts failures into DeskPulseError.
  */
 
-async function invoke<T>(channel: string, schema: ZodType<T>): Promise<IpcResult<T>> {
-  const raw: unknown = await ipcRenderer.invoke(channel);
+async function invoke<T>(
+  channel: string,
+  schema: ZodType<T>,
+  args?: unknown,
+): Promise<IpcResult<T>> {
+  const raw: unknown =
+    args === undefined
+      ? await ipcRenderer.invoke(channel)
+      : await ipcRenderer.invoke(channel, args);
   const failure = ipcFailureSchema.safeParse(raw);
   if (failure.success) {
     return failure.data;
@@ -46,11 +61,28 @@ async function invoke<T>(channel: string, schema: ZodType<T>): Promise<IpcResult
 export interface DeskPulseTransport {
   getAgentStatus(): Promise<IpcResult<AgentStatus>>;
   getSystemSummary(): Promise<IpcResult<SystemSummary>>;
+  getProcesses(query: ProcessQuery): Promise<IpcResult<ProcessesResponse>>;
 }
 
 const transport: DeskPulseTransport = {
   getAgentStatus: () => invoke(IPC_CHANNELS.agentGetStatus, agentStatusSchema),
   getSystemSummary: () => invoke(IPC_CHANNELS.systemGetSummary, systemSummarySchema),
+  getProcesses: (query) => {
+    // Cheap sanity parse — defense in depth, not the boundary; Main
+    // re-validates authoritatively (PDD §17).
+    const parsed = processQuerySchema.safeParse(query);
+    if (!parsed.success) {
+      return Promise.resolve({
+        ok: false as const,
+        error: {
+          code: 'VALIDATION_FAILED' as const,
+          message: 'Invalid process query.',
+          retryable: false,
+        },
+      });
+    }
+    return invoke(IPC_CHANNELS.systemGetProcesses, processesResponseSchema, parsed.data);
+  },
 };
 
 contextBridge.exposeInMainWorld('deskPulse', Object.freeze(transport));

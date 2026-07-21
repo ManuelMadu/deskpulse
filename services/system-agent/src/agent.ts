@@ -1,8 +1,10 @@
 import { Router } from './http/router.js';
 import { createHealthRoute } from './http/routes/health.js';
+import { createProcessesRoute } from './http/routes/processes.js';
 import { createSystemRoute } from './http/routes/system.js';
 import { startAgentServer } from './http/server.js';
 import { METRICS_INTERVAL_MS, MetricsSampler } from './monitoring/metrics.js';
+import { createDarwinProcessProvider } from './platform/darwin-processes.js';
 
 import type { AgentServer } from './http/server.js';
 
@@ -34,6 +36,7 @@ export async function startAgent(options: AgentOptions): Promise<AgentServer> {
     }),
   );
   router.add('GET', '/system', createSystemRoute(sampler));
+  router.add('GET', '/processes', createProcessesRoute(createDarwinProcessProvider()));
 
   const startOptions: Parameters<typeof startAgentServer>[0] = {
     token: options.token,

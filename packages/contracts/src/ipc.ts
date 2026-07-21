@@ -12,6 +12,7 @@ import type { DeskPulseErrorShape } from './error.js';
 export const IPC_CHANNELS = {
   agentGetStatus: 'deskpulse:agent:get-status',
   systemGetSummary: 'deskpulse:system:get-summary',
+  systemGetProcesses: 'deskpulse:system:get-processes',
   /** Single event fan-out channel (Phase 4+). */
   event: 'deskpulse:event',
 } as const;

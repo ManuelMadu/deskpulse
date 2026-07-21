@@ -1,0 +1,4 @@
+{
+  "sampledAt": "2026-07-21T10:15:02.100Z",
+  "processes": [{ "pid": 812, "name": "node", "cpuPercent": 42.1, "memoryRssBytes": 314572800 }]
+}

@@ -86,6 +86,9 @@ test('packaged app boots sandboxed, supervises the agent, and quits without orph
     // → IPC → renderer (DP-9).
     await expect(window.locator('#system-status')).toContainText('CPU', { timeout: 15_000 });
 
+    // Process list flows through the validated-input IPC handler (DP-10).
+    await expect(window.locator('#top-process')).toContainText('% CPU', { timeout: 15_000 });
+
     // The agent runs as a separate OS process (spawned from Resources/agent.cjs).
     await waitUntil(() => agentProcessPids().length === 1, 15_000, 'agent child process');
 

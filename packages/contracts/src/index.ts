@@ -30,6 +30,14 @@ export {
   type AgentReadyHandshake,
 } from './handshake.js';
 export {
+  processInfoSchema,
+  processQuerySchema,
+  processesResponseSchema,
+  type ProcessInfo,
+  type ProcessQuery,
+  type ProcessesResponse,
+} from './processes.js';
+export {
   IPC_CHANNELS,
   agentStatusSchema,
   ipcErr,

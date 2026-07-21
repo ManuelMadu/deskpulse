@@ -1,6 +1,12 @@
 import { DeskPulseError } from '@deskpulse/contracts';
 
-import type { AgentStatus, IpcResult, SystemSummary } from '@deskpulse/contracts';
+import type {
+  AgentStatus,
+  IpcResult,
+  ProcessQuery,
+  ProcessesResponse,
+  SystemSummary,
+} from '@deskpulse/contracts';
 
 /**
  * Renderer-facing API (PDD §17 shape): unwraps the preload transport's
@@ -18,4 +24,6 @@ async function unwrap<T>(result: Promise<IpcResult<T>>): Promise<T> {
 export const api = {
   getAgentStatus: (): Promise<AgentStatus> => unwrap(window.deskPulse.getAgentStatus()),
   getSystemSummary: (): Promise<SystemSummary> => unwrap(window.deskPulse.getSystemSummary()),
+  getProcesses: (query: ProcessQuery): Promise<ProcessesResponse> =>
+    unwrap(window.deskPulse.getProcesses(query)),
 };
