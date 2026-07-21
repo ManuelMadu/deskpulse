@@ -5,9 +5,12 @@ where the build actually is.
 
 ## Current phase
 
-**Phase 3 — System metrics dashboard** (PDD §37). DP-9/DP-10 done; the React Dashboard
-UI (stores, polling hooks with visibility pause, gauges/table) remains before M2.
-Phases 0–2 complete locally; Phase 0's "CI green on PR" criterion remains outstanding
+**Phase 4 — Log-file watching — COMPLETE** (PDD §37). The project's centerpiece and
+largest budget is done: the Tailer state machine, SSE pipeline, and Logs UI ship with
+the full filesystem suite. **Milestone M3 (Trustworthy tailing) reached.** Next up is
+Phase 5 (service health monitoring).
+
+Phases 0–4 complete locally. Phase 0's "CI green on PR" criterion remains outstanding
 until the GitHub remote exists (see Blocked items).
 
 ## Completed tickets
@@ -25,11 +28,12 @@ until the GitHub remote exists (see Blocked items).
 | DP-9   | Metrics sampler + `/system`: pure `computeCpuPercents` over `os.cpus()` tick deltas (clamped ≥ 0 for sleep/wake jumps, 0 % on zero delta, capped at 100 %), `MetricsSampler` with cached 2 s samples and timer teardown owned by the agent's close path, `GET /system` with 503 `NOT_READY` before the first sample                                                                                                                                                                             | 7 unit tests from fixture tick tables (incl. backwards-counter clamp, core-count change), sampler start/stop tests, integration: NOT_READY → contract-valid 200 transition + auth required; packaged E2E asserts live CPU text reaches the renderer (8.2 s)     |
 | DP-10  | `ps` process adapter + `/processes`: `execFile('/bin/ps', ['-axo','pid=,pcpu=,rss=,comm='])` — the agent's only child process, fixed binary + array args; parser tolerating comm values with spaces/parentheses, RSS KiB→bytes, per-process CPU > 100 % allowed; 2 s cache sharing one in-flight `ps` across concurrent calls; query validation (limit 1–50, sortBy cpu\|memory, unknown params rejected); first input-validated IPC handler + preload sanity parse + renderer top-process line | 11 new tests: gnarly-comm parser fixtures, sort/limit, cache single-invocation + expiry, integration against real `/bin/ps` (contract-valid, ordering, full invalid-query matrix → 400 envelopes, auth); packaged E2E asserts top-process text end-to-end       |
 
-| P3-UI | Dashboard UI: React 19 + Zustand + hand-rolled visibility-aware `usePolling` (2 s, zero traffic while hidden, FR-3); sidebar shell with phase-tagged future nav + agent status pill (dot + words, never color alone); CPU big numeral + per-core threshold-tinted bars, memory bar with "approx. used" caveat, host facts; server-sorted process table (CPU/Memory headers, `aria-sort`); honest NOT_READY/error/retry states; design system in PRODUCT.md/DESIGN.md (OKLCH amber-tinted neutrals, light+dark via system, reduced-motion respected) | 8 formatter/threshold unit tests; full gate sweep (94 tests); packaged E2E: pill reaches "Agent running", CPU numeral %, process rows render, no orphans (8.8 s) |
+| P3-UI | Dashboard UI: React 19 + Zustand + hand-rolled visibility-aware `usePolling` (2 s, zero traffic while hidden, FR-3); sidebar shell + agent status pill (dot + words, never color alone); CPU big numeral + per-core threshold-tinted bars, memory bar with "approx. used" caveat, host facts; server-sorted process table (`aria-sort`); honest NOT_READY/error/retry states; design system in PRODUCT.md/DESIGN.md (OKLCH amber-tinted neutrals, light+dark, reduced-motion) | 8 formatter/threshold unit tests; packaged E2E: pill, CPU %, process rows, no orphans (8.8 s) |
+| P4-a…g | **Phase 4 log watching** (7 tasks): SSE event union + watch/logs-IPC contracts; agent EventBus (500-event replay ring, monotonic ids) + `GET /events` (heartbeat, Last-Event-ID replay, `stream.reset`, drop-then-close backpressure, 2-connection cap) + UUIDv7; **Tailer** §24 state machine (open-fd offset reads, inode+device identity, dir watch + 1 s poll; append/truncate/rotate/delete/EACCES; raw-byte encoding-safe LineSplitter, 32 KiB cap, 500 lines/s rate cap); `WatchRegistry` + `POST/DELETE /watch` (5-watch limit, errno→envelope); Main `AgentEventConsumer` (1→10 s reconnect, 45 s staleness, frame validation) + event bridge; path-token registry + native dialog + MRU (renderer never sees a real path); Logs UI (virtualized 5,000-line ring buffer, auto-scroll pin, filter, inline markers, drop notice, ANSI-stripped text-only) | **77 new tests** across the layers; the full filesystem suite (append, backfill+1 MiB cap, monotonic offsets, truncate, logrotate rename+recreate with zero lost lines, delete+recreate, window expiry, 32 KiB capping, 10k-line flood accounting, permissions); SSE + /watch integration over real streams; packaged **E2E flow 2** (open temp log → append → visible ≤ 5 s → no orphan) |
 
 ## Active ticket
 
-**Phase 3 wrap-up → M2**: manual sanity vs Activity Monitor, then Phase 4 (log watching — the project's centerpiece).
+**Phase 5 — Service health monitoring** (DP: monitor registry/scheduler/state machine, CRUD endpoints, `monitor.*` events, Monitors UI). Manual sanity vs Activity Monitor (M2) and scripted rotate/truncate/delete demo (M3) still to be run by hand.
 
 ## Blocked items
 
@@ -95,6 +99,15 @@ Phase 2 "done when": dev app boots, DevTools shows no Node globals in renderer, 
 - No Node globals in renderer ✅ (E2E asserts `process`/`require`/`Buffer`/`ipcRenderer` all absent)
 - No orphan agent after quit ✅ (E2E pgrep check, 2 consecutive green runs)
 - **M1 (Skeleton alive) reached**, with the packaged-build proof (R4/OD-1) done early
+
+Phase 4 "done when": logrotate-style rename+recreate mid-stream produces a `rotated` marker
+and continuous tailing with zero lost lines in the fs test.
+
+- Full filesystem suite ✅ (rotation with zero lost lines asserted directly against the Tailer)
+- SSE + /watch integration ✅ (real streams: replay, reset, backpressure cap, watch limit/errors)
+- E2E flow 2 ✅ (open temp log → append → visible in viewer → no orphan)
+- **M3 (Trustworthy tailing) reached.** 162 unit/integration tests + 2 packaged E2E flows green.
+- Remaining by hand: scripted rotate/truncate/delete demo against the live UI (manual checklist).
 
 ## Commands used to verify
 

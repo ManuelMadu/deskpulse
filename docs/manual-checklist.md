@@ -7,6 +7,20 @@ before any release. Items marked ⏳ have no implementation yet.
 
 - [ ] Fresh clone on a second account/machine: `npm ci && npm test` succeeds with Node ≥ 20.
 
+## Phase 3 — Dashboard (M2)
+
+- [ ] Dashboard values are sane vs Activity Monitor (CPU %, memory, top processes).
+- [ ] Hidden window generates no `/processes` traffic (agent request log).
+
+## Phase 4 — Log watching (M3)
+
+- [ ] Open a log via the native picker; appended lines appear within ~1 s.
+- [ ] `mv app.log app.log.1 && touch app.log` (rotate) → "— rotated —" marker, tailing continues.
+- [ ] `: > app.log` (truncate) → "— truncated —" marker, tailing resumes from 0.
+- [ ] `rm app.log` then recreate → "— file deleted… —" then resumed tailing.
+- [ ] A `/var/log` file that yields EACCES shows an inline permission error.
+- [ ] `yes >> app.log` flood keeps the UI responsive; drop counter appears.
+
 ## Later phases (placeholders, filled in as features land)
 
 - ⏳ Menu-bar icon states (nominal / degraded / agent-down), light & dark menu bar (Phase 6)

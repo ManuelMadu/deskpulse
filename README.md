@@ -26,7 +26,9 @@ Full design: see [docs/DeskPulse-PDD.md](docs/DeskPulse-PDD.md).
 
 ## Status
 
-Phase 0 (repository & tooling) — see [docs/implementation-status.md](docs/implementation-status.md).
+Phases 0–4 complete (tooling, agent, secure IPC, metrics dashboard, log watching);
+milestone M3 (trustworthy tailing) reached. See
+[docs/implementation-status.md](docs/implementation-status.md).
 
 ## Requirements
 
