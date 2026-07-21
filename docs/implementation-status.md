@@ -22,9 +22,11 @@ until the GitHub remote exists (see Blocked items).
 | DP-7   | Supervisor happy path: Electron-free `AgentSupervisor` (spawn with minimal env + per-spawn 256-bit token, stdout handshake parse, contract-validated `/health` confirm ≤ 10 s, SIGTERM→SIGKILL stop), `resolveAgentBundlePath` (dev vs `process.resourcesPath`), quit orchestration in main, agent bundle as Forge `extraResource`; Playwright E2E harness against the **packaged** app                                     | 11 desktop tests (handshake parser, real-bundle start/stop, fresh token per spawn, failure classification, SIGKILL fallback — which caught a real resolve-race bug); packaged E2E smoke: sandboxed renderer, agent child present, quit leaves 0 orphans (6.9 s) |
 | DP-8   | AgentClient + first IPC slice: undici client (5 s timeouts, contract-parsed responses → `MALFORMED_RESPONSE`, envelope rethrow, `AGENT_UNAVAILABLE`/`REQUEST_TIMEOUT`), `ipcMain.handle` pattern with origin-equality sender check, preload transport exposing frozen `getAgentStatus`/`getSystemSummary` (never `ipcRenderer`), renderer api wrapper converting IpcResult → `DeskPulseError`, proof-of-life status display | 9 new desktop tests (client failure-mode matrix over real sockets, sender-check incl. lookalike origins); packaged E2E: `deskPulse` exposed, `ipcRenderer` absent, status line reaches "Agent: running" end-to-end (9.7 s)                                      |
 
+| DP-9 | Metrics sampler + `/system`: pure `computeCpuPercents` over `os.cpus()` tick deltas (clamped ≥ 0 for sleep/wake jumps, 0 % on zero delta, capped at 100 %), `MetricsSampler` with cached 2 s samples and timer teardown owned by the agent's close path, `GET /system` with 503 `NOT_READY` before the first sample | 7 unit tests from fixture tick tables (incl. backwards-counter clamp, core-count change), sampler start/stop tests, integration: NOT_READY → contract-valid 200 transition + auth required; packaged E2E asserts live CPU text reaches the renderer (8.2 s) |
+
 ## Active ticket
 
-**DP-9 — Metrics sampler + `/system`** (Phase 3): CPU tick-delta math (clamped), memory/uptime, `NOT_READY` window; unit tests from fixture tick tables; integration test for ready transition.
+**DP-10 — `ps` process adapter + `/processes`** (Phase 3): `execFile('/bin/ps')` invocation, fixed-column parser (fixture-tested against gnarly `comm` values), 2 s cache, query validation matrix; wire into the renderer.
 
 ## Blocked items
 

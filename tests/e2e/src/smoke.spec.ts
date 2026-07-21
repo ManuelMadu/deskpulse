@@ -82,6 +82,10 @@ test('packaged app boots sandboxed, supervises the agent, and quits without orph
       timeout: 15_000,
     });
 
+    // Live metrics flow the full path: agent sampler → /system → AgentClient
+    // → IPC → renderer (DP-9).
+    await expect(window.locator('#system-status')).toContainText('CPU', { timeout: 15_000 });
+
     // The agent runs as a separate OS process (spawned from Resources/agent.cjs).
     await waitUntil(() => agentProcessPids().length === 1, 15_000, 'agent child process');
 
