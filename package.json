@@ -19,12 +19,14 @@
     "typecheck": "tsc -b --pretty",
     "test": "tsc -b && npm run test --workspaces --if-present",
     "lint": "eslint .",
+    "depcruise": "depcruise --config .dependency-cruiser.cjs packages/contracts/src services/system-agent/src apps/desktop/src tests/e2e/src",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
     "@types/node": "^24.0.0",
+    "dependency-cruiser": "^18.1.0",
     "eslint": "^10.7.0",
     "globals": "^16.0.0",
     "prettier": "^3.9.5",

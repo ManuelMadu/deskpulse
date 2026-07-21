@@ -4,3 +4,4 @@ out/
 .vite/
 coverage/
 package-lock.json
+docs/DeskPulse-PDD.md

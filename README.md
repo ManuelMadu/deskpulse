@@ -55,7 +55,7 @@ docs/                   Implementation status, ADRs, manual checklist
 
 Dependency rules are enforced by lint + CI: `contracts` imports nothing local and no
 Node/Electron runtime; the agent never imports Electron or desktop code; the desktop app
-never imports agent *source* (it spawns the built bundle); the renderer imports neither
+never imports agent _source_ (it spawns the built bundle); the renderer imports neither
 Node nor Electron.
 
 ## License

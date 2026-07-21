@@ -9,13 +9,14 @@ where the build actually is.
 
 ## Completed tickets
 
-| Ticket | Summary | Verified by |
-| ------ | ------- | ----------- |
-| DP-1 | Monorepo scaffold: npm workspaces (contracts, system-agent, desktop, e2e), strict TS with project references, ESLint 10 flat config with dependency walls, Prettier, one passing Vitest suite per workspace, esbuild agent bundle skeleton | `npm ci && npm run typecheck && npm test && npm run lint` |
+| Ticket | Summary                                                                                                                                                                                                                                    | Verified by                                               |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
+| DP-1   | Monorepo scaffold: npm workspaces (contracts, system-agent, desktop, e2e), strict TS with project references, ESLint 10 flat config with dependency walls, Prettier, one passing Vitest suite per workspace, esbuild agent bundle skeleton | `npm ci && npm run typecheck && npm test && npm run lint` |
+| DP-2   | CI pipeline: `ci.yml` on `macos-latest` (lint → depcruise → format → typecheck → agent bundle → tests), dependency-cruiser config enforcing §35 (incl. `no-unresolvable` so a missing exports map can't hide a forbidden edge), commented `windows-latest` placeholder | `npm run depcruise` + every ci.yml step run locally; rules probed with deliberate violations |
 
 ## Active ticket
 
-**DP-2 — CI pipeline**: `ci.yml` on `macos-latest` (install/lint/typecheck/test), dependency-cruiser with the §35 rules, commented `windows-latest` placeholder.
+**DP-3 — Electron Forge + Vite shell**: hello-world window with `sandbox:true`, `contextIsolation:true`, CSP, navigation lock; `npm start` and `npm run make` both work.
 
 ## Blocked items
 
