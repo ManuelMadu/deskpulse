@@ -1,6 +1,6 @@
 import { AGENT_EXIT_CODES } from '@deskpulse/contracts';
 
-import type { AgentServer } from './http/server.js';
+import type { AgentInstance } from './agent.js';
 import type { AgentLogging } from './logging.js';
 import type { AgentReadyHandshake } from '@deskpulse/contracts';
 
@@ -25,7 +25,7 @@ export function printReadyHandshake(port: number, version: string): void {
  * unhandled rejection/exception it logs and exits 1 so the supervisor
  * restarts it (PDD §19).
  */
-export function installLifecycleHandlers(server: AgentServer, logging: AgentLogging): void {
+export function installLifecycleHandlers(agent: AgentInstance, logging: AgentLogging): void {
   let shuttingDown = false;
 
   const shutdown = (signal: string): void => {
@@ -35,6 +35,16 @@ export function installLifecycleHandlers(server: AgentServer, logging: AgentLogg
     shuttingDown = true;
     logging.logger.info({ subsystem: 'lifecycle', signal }, 'shutdown requested');
 
+    // Tell live SSE clients we're going down before we cut the stream, so the
+    // UI shows "stopping" rather than an unexplained disconnect (PDD §19).
+    agent.bus.publish({
+      type: 'agent.status',
+      status: 'stopping',
+      pid: process.pid,
+      version: agent.version,
+      runId: agent.runId,
+    });
+
     // Failsafe: if graceful close hangs, exit inside the deadline anyway.
     const failsafe = setTimeout(() => {
       logging.logger.error({ subsystem: 'lifecycle' }, 'graceful shutdown deadline exceeded');
@@ -43,7 +53,7 @@ export function installLifecycleHandlers(server: AgentServer, logging: AgentLogg
     }, SHUTDOWN_DEADLINE_MS);
     failsafe.unref();
 
-    server
+    agent
       .close()
       .then(() => {
         logging.logger.info({ subsystem: 'lifecycle' }, 'shutdown complete');
