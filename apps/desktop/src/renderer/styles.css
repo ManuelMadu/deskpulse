@@ -233,7 +233,8 @@ button {
 .core-bar {
   height: 5px;
   border-radius: 3px;
-  background: color-mix(in oklch, var(--line) 60%, transparent);
+  /* track sits clearly behind the fill in both appearances */
+  background: color-mix(in oklch, var(--line) 40%, transparent);
   overflow: hidden;
 }
 
@@ -241,7 +242,7 @@ button {
   display: block;
   height: 100%;
   border-radius: 3px;
-  background: var(--ink-faint);
+  background: var(--ink-secondary);
   transition:
     width 240ms var(--ease-out),
     background 240ms var(--ease-out);
@@ -269,7 +270,7 @@ button {
 .mem-bar {
   height: 5px;
   border-radius: 3px;
-  background: color-mix(in oklch, var(--line) 60%, transparent);
+  background: color-mix(in oklch, var(--line) 40%, transparent);
   margin-top: 10px;
   overflow: hidden;
 }
@@ -278,7 +279,7 @@ button {
   display: block;
   height: 100%;
   border-radius: 3px;
-  background: var(--ink-faint);
+  background: var(--ink-secondary);
   transition:
     width 240ms var(--ease-out),
     background 240ms var(--ease-out);
@@ -299,6 +300,9 @@ button {
   gap: 3px;
   text-align: right;
   font-variant-numeric: tabular-nums;
+  /* baseline-align the first fact with the CPU/Memory numerals,
+     not with their 11px labels */
+  padding-top: 20px;
 }
 
 .host-facts .primary {
@@ -321,6 +325,9 @@ button {
 .process-scroll {
   overflow-y: auto;
   min-height: 0;
+  /* the last row breathes instead of clipping at the window edge */
+  padding-bottom: 14px;
+  mask-image: linear-gradient(to bottom, black calc(100% - 12px), transparent);
 }
 
 .process-table {
