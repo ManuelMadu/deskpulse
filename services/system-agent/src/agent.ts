@@ -4,14 +4,17 @@ import { Router } from './http/router.js';
 import { createHealthRoute } from './http/routes/health.js';
 import { createProcessesRoute } from './http/routes/processes.js';
 import { createSystemRoute } from './http/routes/system.js';
+import { createStartWatchRoute, createStopWatchRoute } from './http/routes/watch.js';
 import { createSseHub } from './http/sse.js';
 import { startAgentServer } from './http/server.js';
 import { EventBus } from './events.js';
 import { METRICS_INTERVAL_MS, MetricsSampler } from './monitoring/metrics.js';
+import { WatchRegistry } from './monitoring/watch-registry.js';
 import { createDarwinProcessProvider } from './platform/darwin-processes.js';
 
 import type { AgentServer } from './http/server.js';
 import type { SseHub } from './http/sse.js';
+import type { WatchRegistryOptions } from './monitoring/watch-registry.js';
 
 export const AGENT_VERSION = '0.1.0';
 
@@ -20,11 +23,14 @@ export interface AgentOptions {
   onError?: (error: unknown) => void;
   /** Test override; production uses METRICS_INTERVAL_MS (PDD FR-1). */
   metricsIntervalMs?: number;
+  /** Test override for faster tailer polling / shorter recreation window. */
+  watch?: WatchRegistryOptions;
 }
 
 export interface AgentInstance extends AgentServer {
   bus: EventBus;
   sse: SseHub;
+  watches: WatchRegistry;
   version: string;
   /** Opaque per-process run identifier stamped on agent.status (PDD R5). */
   runId: string;
@@ -43,19 +49,22 @@ export async function startAgent(options: AgentOptions): Promise<AgentInstance> 
   sampler.start();
 
   const sse = createSseHub(bus, { pid: process.pid, version: AGENT_VERSION, runId });
+  const watches = new WatchRegistry(bus, options.watch ?? {});
 
   const router = new Router();
   router.add(
     'GET',
     '/health',
     createHealthRoute(AGENT_VERSION, {
-      activeWatches: () => 0,
+      activeWatches: () => watches.activeCount,
       activeMonitors: () => 0,
     }),
   );
   router.add('GET', '/system', createSystemRoute(sampler));
   router.add('GET', '/processes', createProcessesRoute(createDarwinProcessProvider()));
   router.add('GET', '/events', sse.route);
+  router.add('POST', '/watch', createStartWatchRoute(watches));
+  router.add('DELETE', '/watch/:id', createStopWatchRoute(watches));
 
   const startOptions: Parameters<typeof startAgentServer>[0] = {
     token: options.token,
@@ -77,11 +86,13 @@ export async function startAgent(options: AgentOptions): Promise<AgentInstance> 
     ...server,
     bus,
     sse,
+    watches,
     version: AGENT_VERSION,
     runId,
     close: async () => {
       sampler.stop();
       sse.closeAll();
+      await watches.closeAll();
       await server.close();
     },
   };
