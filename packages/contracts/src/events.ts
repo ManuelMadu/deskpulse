@@ -110,6 +110,19 @@ export const streamResetEventSchema = z.strictObject({
   reason: z.enum(['id-too-old', 'new-run']),
 });
 
+export const diagnosticsStageSchema = z.enum(['collect', 'zip', 'done', 'failed']);
+export type DiagnosticsStage = z.infer<typeof diagnosticsStageSchema>;
+
+export const diagnosticsProgressEventSchema = z.strictObject({
+  type: z.literal('diagnostics.progress'),
+  exportId: z.uuid(),
+  stage: diagnosticsStageSchema,
+  /** Byte-weighted 0–100 completion for the current stage (PDD §27). */
+  percent: z.number().min(0).max(100),
+  currentItem: z.string().optional(),
+  error: deskPulseErrorShapeSchema.optional(),
+});
+
 export const agentEventSchema = z.discriminatedUnion('type', [
   logEntryEventSchema,
   logRotatedEventSchema,
@@ -122,6 +135,7 @@ export const agentEventSchema = z.discriminatedUnion('type', [
   agentWarningEventSchema,
   agentStatusEventSchema,
   streamResetEventSchema,
+  diagnosticsProgressEventSchema,
 ]);
 
 export type AgentEvent = z.infer<typeof agentEventSchema>;

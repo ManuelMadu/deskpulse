@@ -41,6 +41,8 @@ export {
   DROPPABLE_EVENT_TYPES,
   agentEventSchema,
   agentStatusEventSchema,
+  diagnosticsProgressEventSchema,
+  diagnosticsStageSchema,
   logEntryEventSchema,
   monitorResultEventSchema,
   monitorUnhealthyEventSchema,
@@ -48,8 +50,16 @@ export {
   streamResetEventSchema,
   type AgentEvent,
   type AgentEventType,
+  type DiagnosticsStage,
   type LogEntry,
 } from './events.js';
+export {
+  MAX_EXTRA_LOG_PATHS,
+  exportRequestSchema,
+  exportStartedSchema,
+  type ExportRequest,
+  type ExportStarted,
+} from './diagnostics.js';
 export {
   expectedStatusSchema,
   isLoopbackUrl,
