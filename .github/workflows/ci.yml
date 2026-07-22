@@ -32,14 +32,17 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Dependency boundaries
-        run: npm run depcruise
-
       - name: Format check
         run: npm run format:check
 
+      # tsc -b emits every workspace's dist/, which the dependency-cruiser
+      # `no-unresolvable` rule needs to resolve the @deskpulse/* packages — so
+      # the build must run before the boundary check on a fresh checkout.
       - name: Typecheck + build
         run: npm run typecheck
+
+      - name: Dependency boundaries
+        run: npm run depcruise
 
       - name: Agent bundle
         run: npm run build -w @deskpulse/system-agent
