@@ -40,6 +40,7 @@ interface LogsState {
   removeWatch: (watchId: string) => Promise<void>;
   setActive: (watchId: string) => void;
   setFilter: (filter: string) => void;
+  remapWatches: (watchRemap: Record<string, string>) => void;
   ingest: (event: AgentEvent) => void;
 }
 
@@ -91,6 +92,28 @@ export const useLogsStore = create<LogsState>((set, get) => ({
 
   setFilter(filter) {
     set({ filter });
+  },
+
+  remapWatches(watchRemap) {
+    // After an agent restart Main re-issued the watches under new ids (§28).
+    // Re-key each open view to its new id so incoming lines land in the same
+    // pane, and mark the resume point.
+    set((state) => {
+      const watches: Record<string, WatchView> = {};
+      const order = state.order.map((id) => watchRemap[id] ?? id);
+      for (const [id, view] of Object.entries(state.watches)) {
+        const newId = watchRemap[id] ?? id;
+        watches[newId] = appendRows(
+          { ...view, watchId: newId, status: 'active', statusMessage: undefined },
+          [marker('— agent restarted, resuming —')],
+        );
+      }
+      const activeWatchId =
+        state.activeWatchId === undefined
+          ? undefined
+          : (watchRemap[state.activeWatchId] ?? state.activeWatchId);
+      return { watches, order, activeWatchId };
+    });
   },
 
   ingest(event) {

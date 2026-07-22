@@ -23,13 +23,27 @@ export const IPC_CHANNELS = {
   monitorsRemove: 'deskpulse:monitors:remove',
   settingsGet: 'deskpulse:settings:get',
   settingsSetLaunchAtLogin: 'deskpulse:settings:set-launch-at-login',
+  agentRestart: 'deskpulse:agent:restart',
   /** Single event fan-out channel (agent SSE events, forwarded by Main). */
   event: 'deskpulse:event',
   /** Main→renderer navigation push (e.g. a notification click, PDD §25). */
   navigate: 'deskpulse:navigate',
+  /** Main→renderer reconcile push after an agent restart (PDD §28). */
+  reconcile: 'deskpulse:reconcile',
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
+
+/**
+ * Sent to the renderer after the supervisor re-pushes config to a freshly
+ * restarted agent (PDD §28). The new agent minted new ids, so `watchRemap`
+ * maps each still-open watch's old id to its new id; the renderer re-keys its
+ * log views (marking "resuming") and refetches the monitor snapshot.
+ */
+export const reconcilePayloadSchema = z.strictObject({
+  watchRemap: z.record(z.uuid(), z.uuid()),
+});
+export type ReconcilePayload = z.infer<typeof reconcilePayloadSchema>;
 
 /**
  * Screens Main can ask the renderer to show (PDD §25 notification click

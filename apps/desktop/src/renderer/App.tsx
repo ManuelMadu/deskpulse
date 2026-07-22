@@ -52,7 +52,9 @@ export function App(): ReactElement {
   const agent = useDashboardStore((s) => s.agent);
   const refresh = useDashboardStore((s) => s.refresh);
   const ingestLog = useLogsStore((s) => s.ingest);
+  const remapWatches = useLogsStore((s) => s.remapWatches);
   const ingestMonitor = useMonitorsStore((s) => s.ingest);
+  const refreshMonitors = useMonitorsStore((s) => s.refresh);
 
   // Poll at the shell level so the sidebar agent pill stays live on every
   // screen; the hook pauses entirely while the window is hidden (FR-3).
@@ -71,6 +73,17 @@ export function App(): ReactElement {
   // Main can steer the renderer to a screen (PDD §25): a notification click
   // raises the window and jumps to Monitors.
   useEffect(() => api.onNavigate((target) => setScreen(target)), []);
+
+  // After an agent restart, Main re-pushed config to the fresh agent (PDD §28):
+  // re-key open log views to their new watch ids and refetch the monitor list.
+  useEffect(
+    () =>
+      api.onReconcile((payload) => {
+        remapWatches(payload.watchRemap);
+        void refreshMonitors();
+      }),
+    [remapWatches, refreshMonitors],
+  );
 
   return (
     <div className="shell">

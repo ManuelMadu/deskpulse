@@ -11,6 +11,7 @@ import type {
   ProcessQuery,
   ProcessesResponse,
   RecentFile,
+  ReconcilePayload,
   RemoveMonitorInput,
   SelectedFile,
   SetLaunchAtLoginInput,
@@ -55,8 +56,11 @@ export const api = {
   getSettings: (): Promise<AppSettings> => unwrap(window.deskPulse.getSettings()),
   setLaunchAtLogin: (input: SetLaunchAtLoginInput): Promise<AppSettings> =>
     unwrap(window.deskPulse.setLaunchAtLogin(input)),
+  restartAgent: (): Promise<void> => unwrap(window.deskPulse.restartAgent()),
   onAgentEvent: (callback: (event: AgentEvent) => void): (() => void) =>
     window.deskPulse.onAgentEvent(callback),
   onNavigate: (callback: (target: NavigationTarget) => void): (() => void) =>
     window.deskPulse.onNavigate(callback),
+  onReconcile: (callback: (payload: ReconcilePayload) => void): (() => void) =>
+    window.deskPulse.onReconcile(callback),
 };

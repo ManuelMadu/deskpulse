@@ -106,8 +106,10 @@ export {
   ipcFailureSchema,
   ipcOk,
   navigationTargetSchema,
+  reconcilePayloadSchema,
   type AgentStatus,
   type IpcChannel,
   type IpcResult,
   type NavigationTarget,
+  type ReconcilePayload,
 } from './ipc.js';

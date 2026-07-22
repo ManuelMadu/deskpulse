@@ -28,6 +28,7 @@ import {
 import { isTrustedSenderUrl } from './sender-check.js';
 import { handleGetSettings, handleSetLaunchAtLogin, settingsInputSchemas } from './settings.js';
 
+import type { AgentConfigStore } from '../agent-config-store.js';
 import type { AgentClient } from '../agent-client.js';
 import type { AgentSupervisor } from '../agent-supervisor.js';
 import type { PathTokenRegistry } from '../path-tokens.js';
@@ -95,6 +96,7 @@ export function registerIpcHandlers(deps: {
   supervisor: AgentSupervisor;
   client: AgentClient;
   tokens: PathTokenRegistry;
+  store: AgentConfigStore;
   launchAtLogin: LaunchAtLoginController;
   defaultLogLocations: string[];
   devServerUrl: string | undefined;
@@ -102,6 +104,7 @@ export function registerIpcHandlers(deps: {
   const logsDeps = {
     client: deps.client,
     tokens: deps.tokens,
+    store: deps.store,
     defaultLogLocations: deps.defaultLogLocations,
   };
 
@@ -138,19 +141,19 @@ export function registerIpcHandlers(deps: {
     IPC_CHANNELS.monitorsAdd,
     deps.devServerUrl,
     monitorsInputSchemas.add,
-    handleAddMonitor(deps.client),
+    handleAddMonitor(deps.client, deps.store),
   );
   handle(
     IPC_CHANNELS.monitorsUpdate,
     deps.devServerUrl,
     monitorsInputSchemas.update,
-    handleUpdateMonitor(deps.client),
+    handleUpdateMonitor(deps.client, deps.store),
   );
   handle(
     IPC_CHANNELS.monitorsRemove,
     deps.devServerUrl,
     monitorsInputSchemas.remove,
-    handleRemoveMonitor(deps.client),
+    handleRemoveMonitor(deps.client, deps.store),
   );
 
   handle(
@@ -165,4 +168,7 @@ export function registerIpcHandlers(deps: {
     settingsInputSchemas.setLaunchAtLogin,
     handleSetLaunchAtLogin(deps.launchAtLogin),
   );
+
+  // Manual "Restart agent" (PDD §7/§28): clears the backoff ladder and retries.
+  handle(IPC_CHANNELS.agentRestart, deps.devServerUrl, noInput, () => deps.supervisor.restart());
 }

@@ -7,6 +7,7 @@ import {
   monitorWithStatusSchema,
   navigationTargetSchema,
   processQuerySchema,
+  reconcilePayloadSchema,
   processesResponseSchema,
   recentFileSchema,
   selectedFileSchema,
@@ -27,6 +28,7 @@ import type {
   ProcessQuery,
   ProcessesResponse,
   RecentFile,
+  ReconcilePayload,
   RemoveMonitorInput,
   SelectedFile,
   SetLaunchAtLoginInput,
@@ -96,10 +98,14 @@ export interface DeskPulseTransport {
   removeMonitor(input: RemoveMonitorInput): Promise<IpcResult<void>>;
   getSettings(): Promise<IpcResult<AppSettings>>;
   setLaunchAtLogin(input: SetLaunchAtLoginInput): Promise<IpcResult<AppSettings>>;
+  /** Ask Main to restart the agent now (manual recovery from `failed`). */
+  restartAgent(): Promise<IpcResult<void>>;
   /** Subscribe to forwarded agent events; returns an unsubscribe function. */
   onAgentEvent(callback: (event: AgentEvent) => void): () => void;
   /** Subscribe to Main-initiated screen navigation (e.g. notification click). */
   onNavigate(callback: (target: NavigationTarget) => void): () => void;
+  /** Subscribe to post-restart reconcile pushes (watch id remap, PDD §28). */
+  onReconcile(callback: (payload: ReconcilePayload) => void): () => void;
 }
 
 const transport: DeskPulseTransport = {
@@ -132,6 +138,7 @@ const transport: DeskPulseTransport = {
   getSettings: () => invoke(IPC_CHANNELS.settingsGet, appSettingsSchema),
   setLaunchAtLogin: (input) =>
     invoke(IPC_CHANNELS.settingsSetLaunchAtLogin, appSettingsSchema, input),
+  restartAgent: () => invoke(IPC_CHANNELS.agentRestart, z.void()),
 
   onAgentEvent: (callback) => {
     const listener = (_event: IpcRendererEvent, payload: unknown): void => {
@@ -155,6 +162,17 @@ const transport: DeskPulseTransport = {
     };
     ipcRenderer.on(IPC_CHANNELS.navigate, listener);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.navigate, listener);
+  },
+
+  onReconcile: (callback) => {
+    const listener = (_event: IpcRendererEvent, payload: unknown): void => {
+      const parsed = reconcilePayloadSchema.safeParse(payload);
+      if (parsed.success) {
+        callback(parsed.data);
+      }
+    };
+    ipcRenderer.on(IPC_CHANNELS.reconcile, listener);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.reconcile, listener);
   },
 };
 

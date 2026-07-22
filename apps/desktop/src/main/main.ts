@@ -1,8 +1,10 @@
 import { Notification, app } from 'electron';
 
 import { AgentClient } from './agent-client.js';
+import { AgentConfigStore } from './agent-config-store.js';
 import { AgentEventConsumer } from './agent-events.js';
 import { resolveAgentBundlePath } from './agent-paths.js';
+import { reconcileAgentConfig } from './agent-reconciler.js';
 import { installAppLifecycle, launchInitialWindow, openMainWindow } from './app-lifecycle.js';
 import { AgentSupervisor } from './agent-supervisor.js';
 import { forwardAgentEvent } from './event-bridge.js';
@@ -92,6 +94,7 @@ void app.whenReady().then(() => {
   };
   const client = new AgentClient(endpoint);
   const tokens = new PathTokenRegistry();
+  const configStore = new AgentConfigStore();
   const listMonitors = handleListMonitors(client);
 
   // Aggregate health, distilled from the same event stream the renderer sees,
@@ -170,25 +173,44 @@ void app.whenReady().then(() => {
   eventConsumer.start();
 
   // Supervisor state changes (spawning/running/backoff/failed) drive the tray's
-  // agent-down state and, on a fresh agent (boot or post-restart), reattach the
-  // SSE stream so it resumes against the new port/token and reseed the monitor
-  // list. The renderer's status poll picks up the restart banner data.
+  // agent-down state. On a fresh agent, reattach the SSE stream to the new
+  // port/token. The very first `running` is boot; every later one is a recovery
+  // (crash or manual restart), so re-push the config the new stateless agent
+  // lost and tell the renderer to re-key its open log views (PDD §28).
+  let agentHasRun = false;
   onAgentStateChange = (status: AgentStatus): void => {
     const up = status.state === 'running';
     if (health.setAgentUp(up)) {
       refreshTray();
     }
-    if (up) {
-      eventConsumer?.stop();
-      eventConsumer?.start();
-      void hydrateTray();
+    if (!up) {
+      return;
     }
+    eventConsumer?.stop();
+    eventConsumer?.start();
+    if (!agentHasRun) {
+      agentHasRun = true;
+      void hydrateTray();
+      return;
+    }
+    void reconcileAgentConfig({
+      client,
+      store: configStore,
+      log: (level, msg, ctx) =>
+        console[level === 'warn' ? 'warn' : 'log'](`[reconcile] ${msg}`, ctx ?? ''),
+    })
+      .then((payload) => {
+        getMainWindow()?.webContents.send(IPC_CHANNELS.reconcile, payload);
+        void hydrateTray();
+      })
+      .catch((error: unknown) => console.error('[reconcile] failed', error));
   };
 
   registerIpcHandlers({
     supervisor,
     client,
     tokens,
+    store: configStore,
     launchAtLogin: new LaunchAtLoginController(electronLoginItemGateway),
     defaultLogLocations: defaultLogLocations(),
     devServerUrl: MAIN_WINDOW_VITE_DEV_SERVER_URL || undefined,

@@ -8,6 +8,7 @@ import {
 
 import { selectLogFile } from '../dialogs.js';
 
+import type { AgentConfigStore } from '../agent-config-store.js';
 import type { AgentClient } from '../agent-client.js';
 import type { PathTokenRegistry } from '../path-tokens.js';
 import type {
@@ -21,6 +22,7 @@ import type {
 export interface LogsDeps {
   client: AgentClient;
   tokens: PathTokenRegistry;
+  store: AgentConfigStore;
   defaultLogLocations: string[];
 }
 
@@ -46,11 +48,10 @@ export function handleStartWatch(
         retryable: false,
       });
     }
-    const created = await deps.client.post(
-      '/watch',
-      { path: realPath, fromEnd: input.fromEnd, encoding: 'utf8' },
-      watchCreatedSchema,
-    );
+    const spec = { path: realPath, fromEnd: input.fromEnd, encoding: 'utf8' as const };
+    const created = await deps.client.post('/watch', spec, watchCreatedSchema);
+    // Remember the watch so it can be re-issued to a restarted agent (§28).
+    deps.store.recordWatch(created.id, spec);
     return {
       watchId: created.id,
       displayPath: created.path,
@@ -61,7 +62,10 @@ export function handleStartWatch(
 }
 
 export function handleStopWatch(deps: LogsDeps): (input: StopLogWatchInput) => Promise<void> {
-  return (input) => deps.client.delete(`/watch/${input.watchId}`);
+  return async (input) => {
+    await deps.client.delete(`/watch/${input.watchId}`);
+    deps.store.removeWatch(input.watchId);
+  };
 }
 
 export const logsInputSchemas = {
