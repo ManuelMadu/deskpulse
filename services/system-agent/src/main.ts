@@ -6,6 +6,7 @@
 import { AGENT_VERSION, startAgent } from './agent.js';
 import { AGENT_EXIT_CODES, installLifecycleHandlers, printReadyHandshake } from './lifecycle.js';
 import { createAgentLogging } from './logging.js';
+import { startOrphanGuard } from './orphan-guard.js';
 
 const token = process.env['DESKPULSE_AGENT_TOKEN'];
 if (token === undefined || token.length === 0) {
@@ -23,6 +24,15 @@ startAgent({
 })
   .then((server) => {
     installLifecycleHandlers(server, logging);
+    // Self-terminate if Main dies without SIGTERMing us (PDD §28): no orphan
+    // agent survives a `kill -9` of the app.
+    startOrphanGuard({
+      onOrphaned: () => {
+        logging.logger.warn({ subsystem: 'lifecycle' }, 'parent gone; self-terminating');
+        logging.close();
+        process.exit(0);
+      },
+    });
     printReadyHandshake(server.port, AGENT_VERSION);
     logging.logger.info({ subsystem: 'lifecycle', port: server.port }, 'agent ready');
   })
