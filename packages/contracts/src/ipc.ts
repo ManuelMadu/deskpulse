@@ -63,11 +63,24 @@ export const ipcFailureSchema = z.strictObject({
 /**
  * Supervisor status as shown to the renderer. Never contains the token or
  * the agent port — the renderer has no business dialing the agent (PDD §14).
+ * The optional `restart` block drives the crash-recovery banner (PDD §7/§28):
+ * "restarting in 4 s… attempt 3/5", and the manual "Restart agent" affordance
+ * once `state` is `failed`.
  */
 export const agentStatusSchema = z.strictObject({
   state: z.enum(['idle', 'spawning', 'running', 'stopping', 'stopped', 'backoff', 'failed']),
   pid: z.number().int().positive().optional(),
   version: z.string().min(1).optional(),
+  restart: z
+    .strictObject({
+      /** 1-based attempt number of the pending/most-recent restart. */
+      attempt: z.number().int().positive(),
+      /** Restarts allowed inside the rolling window before `failed`. */
+      maxAttempts: z.number().int().positive(),
+      /** Epoch ms the next automatic attempt fires (present in `backoff`). */
+      nextRetryAtMs: z.number().int().positive().optional(),
+    })
+    .optional(),
 });
 
 export type AgentStatus = z.infer<typeof agentStatusSchema>;

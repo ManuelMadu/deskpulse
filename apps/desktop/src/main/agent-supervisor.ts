@@ -3,22 +3,38 @@ import { randomBytes } from 'node:crypto';
 
 import { agentReadyHandshakeSchema, healthResponseSchema } from '@deskpulse/contracts';
 
-import type { AgentReadyHandshake } from '@deskpulse/contracts';
+import {
+  DEFAULT_BACKOFF_BASE_MS,
+  DEFAULT_BACKOFF_CAP_MS,
+  DEFAULT_MAX_RESTARTS,
+  DEFAULT_RESTART_WINDOW_MS,
+  RestartTracker,
+  computeBackoffDelay,
+} from './agent-restart-policy.js';
+
+import type { AgentReadyHandshake, AgentStatus } from '@deskpulse/contracts';
 import type { ChildProcess } from 'node:child_process';
 
 /**
- * Agent supervisor — happy path (DP-7): spawn, readiness handshake, health
- * confirmation, graceful stop. Backoff/restart arrives in Phase 7 (PDD §28).
+ * Agent supervisor (PDD §28). `start()`/`stop()` are the single-attempt
+ * primitives (spawn, readiness handshake, health confirm, graceful kill). The
+ * supervised layer on top — `launch()`, `restart()` and the exit watcher —
+ * grows the full state machine: crash → backoff ladder → respawn, a rolling
+ * window that trips `failed` after too many restarts, and a stable-running
+ * reset. Every state change is pushed through `onStateChange` so the sidebar
+ * pill, tray icon, and crash-recovery banner stay live.
  *
- * Deliberately Electron-free: the bundle path and env come from the caller,
- * so the whole class is exercised in tests against the real agent bundle
+ * Deliberately Electron-free: bundle path, env, timers, and clock are all
+ * injected, so the whole class is exercised against the real agent bundle
  * under plain Node.
  */
 
 export const HANDSHAKE_DEADLINE_MS = 10_000;
 export const STOP_KILL_TIMEOUT_MS = 5_000;
+export const DEFAULT_STABLE_RESET_MS = 60_000;
 
-export type SupervisorState = 'idle' | 'spawning' | 'running' | 'stopping' | 'stopped';
+export type SupervisorState =
+  'idle' | 'spawning' | 'running' | 'stopping' | 'stopped' | 'backoff' | 'failed';
 
 export interface AgentHandle {
   port: number;
@@ -79,6 +95,8 @@ export async function killProcessGracefully(
   });
 }
 
+type TimerHandle = ReturnType<typeof setTimeout>;
+
 export interface SupervisorOptions {
   bundlePath: string;
   /** The executable to run the bundle with (Electron binary or node). */
@@ -87,6 +105,17 @@ export interface SupervisorOptions {
   env?: Record<string, string>;
   handshakeDeadlineMs?: number;
   stopKillTimeoutMs?: number;
+  /** Restart tuning (PDD §28); defaults match the spec. */
+  backoffBaseMs?: number;
+  backoffCapMs?: number;
+  maxRestarts?: number;
+  restartWindowMs?: number;
+  stableResetMs?: number;
+  /** Pushed on every supervisor state change (running/backoff/failed/…). */
+  onStateChange?: (status: AgentStatus) => void;
+  now?: () => number;
+  setTimer?: (fn: () => void, ms: number) => TimerHandle;
+  clearTimer?: (handle: TimerHandle) => void;
   log: (level: 'info' | 'warn' | 'error', msg: string, ctx?: Record<string, unknown>) => void;
 }
 
@@ -95,7 +124,44 @@ export class AgentSupervisor {
   private handle: AgentHandle | undefined;
   private stateValue: SupervisorState = 'idle';
 
-  constructor(private readonly options: SupervisorOptions) {}
+  // Supervised-restart state.
+  private stopping = false;
+  private restartAttempt = 0;
+  private restartInfo: AgentStatus['restart'];
+  private watchedChild: ChildProcess | undefined;
+  private backoffTimer: TimerHandle | undefined;
+  private stableTimer: TimerHandle | undefined;
+  private readonly tracker: RestartTracker;
+
+  private readonly backoffBaseMs: number;
+  private readonly backoffCapMs: number;
+  private readonly maxRestarts: number;
+  private readonly stableResetMs: number;
+  private readonly now: () => number;
+  private readonly setTimer: (fn: () => void, ms: number) => TimerHandle;
+  private readonly clearTimer: (handle: TimerHandle) => void;
+
+  constructor(private readonly options: SupervisorOptions) {
+    this.backoffBaseMs = options.backoffBaseMs ?? DEFAULT_BACKOFF_BASE_MS;
+    this.backoffCapMs = options.backoffCapMs ?? DEFAULT_BACKOFF_CAP_MS;
+    this.maxRestarts = options.maxRestarts ?? DEFAULT_MAX_RESTARTS;
+    this.stableResetMs = options.stableResetMs ?? DEFAULT_STABLE_RESET_MS;
+    this.now = options.now ?? Date.now;
+    this.setTimer =
+      options.setTimer ??
+      ((fn, ms) => {
+        // unref so a pending backoff/stable timer never holds the process open
+        // (the Electron app stays alive on its own; tests can exit cleanly).
+        const handle = setTimeout(fn, ms);
+        handle.unref?.();
+        return handle;
+      });
+    this.clearTimer = options.clearTimer ?? ((handle) => clearTimeout(handle));
+    this.tracker = new RestartTracker(
+      this.maxRestarts,
+      options.restartWindowMs ?? DEFAULT_RESTART_WINDOW_MS,
+    );
+  }
 
   get state(): SupervisorState {
     return this.stateValue;
@@ -105,9 +171,164 @@ export class AgentSupervisor {
     return this.handle;
   }
 
+  /** The renderer-facing status snapshot (state + pid/version + restart info). */
+  status(): AgentStatus {
+    const status: AgentStatus = { state: this.stateValue };
+    if (this.handle) {
+      status.pid = this.handle.pid;
+      status.version = this.handle.version;
+    }
+    if (this.restartInfo) {
+      status.restart = this.restartInfo;
+    }
+    return status;
+  }
+
+  /**
+   * Supervised entry point: start the agent and keep it alive, restarting with
+   * backoff on unexpected exit. Never rejects — failures become `backoff`/
+   * `failed` state, not thrown errors (unlike the low-level `start()`).
+   */
+  async launch(): Promise<void> {
+    this.stopping = false;
+    await this.attempt();
+  }
+
+  /** Manual "Restart agent" (PDD §7/§28): clear the ladder and try immediately. */
+  async restart(): Promise<void> {
+    this.clearTimers();
+    this.tracker.reset();
+    this.restartAttempt = 0;
+    this.restartInfo = undefined;
+    if (this.child) {
+      await this.stop();
+    }
+    this.stopping = false;
+    await this.attempt();
+  }
+
+  private async attempt(): Promise<void> {
+    if (this.stopping) {
+      return;
+    }
+    this.setState('spawning');
+    try {
+      await this.start();
+    } catch (error) {
+      this.options.log('warn', 'agent start attempt failed', { cause: String(error) });
+      this.scheduleRestart();
+      return;
+    }
+    this.restartInfo = undefined;
+    this.setState('running');
+    this.watchExit();
+    this.startStableTimer();
+  }
+
+  private watchExit(): void {
+    const child = this.child;
+    if (!child) {
+      return;
+    }
+    this.watchedChild = child;
+    const onExit = (): void => {
+      if (this.watchedChild === child) {
+        this.onUnexpectedExit();
+      }
+    };
+    if (child.exitCode !== null || child.signalCode !== null) {
+      // Died in the gap between health confirmation and attaching the watcher.
+      queueMicrotask(onExit);
+      return;
+    }
+    child.once('exit', onExit);
+  }
+
+  private onUnexpectedExit(): void {
+    if (this.stopping) {
+      return;
+    }
+    this.options.log('warn', 'agent exited unexpectedly; scheduling restart', {
+      pid: this.handle?.pid,
+    });
+    this.clearStableTimer();
+    this.child = undefined;
+    this.handle = undefined;
+    this.watchedChild = undefined;
+    this.scheduleRestart();
+  }
+
+  private scheduleRestart(): void {
+    this.clearStableTimer();
+    const withinBudget = this.tracker.record(this.now());
+    this.restartAttempt += 1;
+    if (!withinBudget) {
+      this.restartInfo = { attempt: this.restartAttempt, maxAttempts: this.maxRestarts };
+      this.options.log('error', 'agent restart budget exhausted; entering failed state', {
+        restarts: this.tracker.count,
+      });
+      this.setState('failed');
+      return;
+    }
+    const delay = computeBackoffDelay(
+      this.restartAttempt - 1,
+      this.backoffBaseMs,
+      this.backoffCapMs,
+    );
+    this.restartInfo = {
+      attempt: this.restartAttempt,
+      maxAttempts: this.maxRestarts,
+      nextRetryAtMs: this.now() + delay,
+    };
+    this.setState('backoff');
+    this.backoffTimer = this.setTimer(() => {
+      this.backoffTimer = undefined;
+      void this.attempt();
+    }, delay);
+  }
+
+  private startStableTimer(): void {
+    this.clearStableTimer();
+    this.stableTimer = this.setTimer(() => {
+      this.stableTimer = undefined;
+      this.restartAttempt = 0;
+      this.tracker.reset();
+      this.restartInfo = undefined;
+      this.options.log('info', 'agent stable; restart ladder reset');
+    }, this.stableResetMs);
+  }
+
+  private clearBackoffTimer(): void {
+    if (this.backoffTimer !== undefined) {
+      this.clearTimer(this.backoffTimer);
+      this.backoffTimer = undefined;
+    }
+  }
+
+  private clearStableTimer(): void {
+    if (this.stableTimer !== undefined) {
+      this.clearTimer(this.stableTimer);
+      this.stableTimer = undefined;
+    }
+  }
+
+  private clearTimers(): void {
+    this.clearBackoffTimer();
+    this.clearStableTimer();
+  }
+
+  private setState(state: SupervisorState): void {
+    this.stateValue = state;
+    this.options.onStateChange?.(this.status());
+  }
+
   async start(): Promise<AgentHandle> {
     if (this.stateValue === 'running' || this.stateValue === 'spawning') {
-      throw new Error(`cannot start agent from state ${this.stateValue}`);
+      // Re-entrant guard only for direct callers; the supervised path sets
+      // 'spawning' itself, so allow that transition through.
+      if (this.child) {
+        throw new Error(`cannot start agent from state ${this.stateValue}`);
+      }
     }
     this.stateValue = 'spawning';
     const token = randomBytes(32).toString('hex');
@@ -234,9 +455,14 @@ export class AgentSupervisor {
 
   /** SIGTERM the agent; SIGKILL if it hasn't exited within the timeout. */
   async stop(): Promise<void> {
+    // Intentional stop: cancel any pending restart and block the exit watcher.
+    this.stopping = true;
+    this.clearTimers();
+    this.watchedChild = undefined;
     const child = this.child;
     if (!child || this.stateValue === 'stopped' || this.stateValue === 'idle') {
       this.stateValue = 'stopped';
+      this.handle = undefined;
       return;
     }
     this.stateValue = 'stopping';

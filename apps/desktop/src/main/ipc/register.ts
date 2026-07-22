@@ -32,7 +32,7 @@ import type { AgentClient } from '../agent-client.js';
 import type { AgentSupervisor } from '../agent-supervisor.js';
 import type { PathTokenRegistry } from '../path-tokens.js';
 import type { LaunchAtLoginController } from '../platform/launch-at-login.js';
-import type { AgentStatus, IpcResult } from '@deskpulse/contracts';
+import type { IpcResult } from '@deskpulse/contracts';
 import type { IpcMainInvokeEvent } from 'electron';
 import type { ZodType } from 'zod';
 
@@ -105,15 +105,7 @@ export function registerIpcHandlers(deps: {
     defaultLogLocations: deps.defaultLogLocations,
   };
 
-  handle(IPC_CHANNELS.agentGetStatus, deps.devServerUrl, noInput, (): AgentStatus => {
-    const handle = deps.supervisor.currentHandle;
-    const status: AgentStatus = { state: deps.supervisor.state };
-    if (handle) {
-      status.pid = handle.pid;
-      status.version = handle.version;
-    }
-    return status;
-  });
+  handle(IPC_CHANNELS.agentGetStatus, deps.devServerUrl, noInput, () => deps.supervisor.status());
 
   handle(IPC_CHANNELS.systemGetSummary, deps.devServerUrl, noInput, () =>
     deps.client.get('/system', systemSummarySchema),

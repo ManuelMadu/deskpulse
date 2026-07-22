@@ -21,7 +21,7 @@ import { IPC_CHANNELS, monitorWithStatusSchema } from '@deskpulse/contracts';
 
 import type { Presenter } from './notifications.js';
 import type { WindowFactoryOptions } from './windows.js';
-import type { AgentEvent } from '@deskpulse/contracts';
+import type { AgentEvent, AgentStatus } from '@deskpulse/contracts';
 
 /**
  * Present a native banner (PDD §13/§25). On unsigned dev builds macOS
@@ -69,9 +69,15 @@ app.on('web-contents-created', (_event, contents) => {
 });
 
 void app.whenReady().then(() => {
+  // Assigned once the tray/health/consumer exist below; the supervisor only
+  // fires state changes after launch() at the end, so this is always set by
+  // the time it is called.
+  let onAgentStateChange: (status: AgentStatus) => void = () => undefined;
+
   supervisor = new AgentSupervisor({
     bundlePath: resolveAgentBundlePath(),
     execPath: process.execPath,
+    onStateChange: (status) => onAgentStateChange(status),
     log: (level, msg, ctx) => {
       // Pino-backed main logging arrives in Phase 2's logging ticket; until
       // then supervisor events go to the terminal in dev.
@@ -163,6 +169,22 @@ void app.whenReady().then(() => {
   );
   eventConsumer.start();
 
+  // Supervisor state changes (spawning/running/backoff/failed) drive the tray's
+  // agent-down state and, on a fresh agent (boot or post-restart), reattach the
+  // SSE stream so it resumes against the new port/token and reseed the monitor
+  // list. The renderer's status poll picks up the restart banner data.
+  onAgentStateChange = (status: AgentStatus): void => {
+    const up = status.state === 'running';
+    if (health.setAgentUp(up)) {
+      refreshTray();
+    }
+    if (up) {
+      eventConsumer?.stop();
+      eventConsumer?.start();
+      void hydrateTray();
+    }
+  };
+
   registerIpcHandlers({
     supervisor,
     client,
@@ -205,23 +227,10 @@ void app.whenReady().then(() => {
 
   launchInitialWindow(windowOptions);
 
-  supervisor
-    .start()
-    .then(() => {
-      // The agent is alive: reflect it in the tray and seed the monitor list.
-      if (health.setAgentUp(true)) {
-        refreshTray();
-      }
-      void hydrateTray();
-    })
-    .catch((error: unknown) => {
-      // Happy-path ticket: a failed start is logged and surfaced via
-      // getAgentStatus; restart/backoff behavior is Phase 7 (PDD §28).
-      console.error('[supervisor] agent failed to start', error);
-      if (health.setAgentUp(false)) {
-        refreshTray();
-      }
-    });
+  // Supervised launch (PDD §28): keeps the agent alive across crashes with a
+  // backoff ladder, tripping to `failed` after too many restarts. Never
+  // rejects — failures surface as state, handled by onAgentStateChange.
+  void supervisor.launch();
 
   // Periodically reconcile the tray's monitor list so removed/renamed monitors
   // and states settle even without a transition event.

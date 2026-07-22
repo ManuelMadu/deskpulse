@@ -125,6 +125,67 @@ describe('AgentSupervisor happy path (DP-7)', () => {
   }, 10_000);
 });
 
+describe('AgentSupervisor crash recovery (Phase 7, §28)', () => {
+  it('restarts the agent after an unexpected crash and reaches running again', async () => {
+    const states: string[] = [];
+    const supervisor = makeSupervisor({
+      backoffBaseMs: 100,
+      onStateChange: (status) => states.push(status.state),
+    });
+
+    await supervisor.launch();
+    expect(supervisor.state).toBe('running');
+    const firstPid = supervisor.currentHandle?.pid;
+    expect(firstPid).toBeDefined();
+
+    // Simulate a hard crash of the agent process.
+    process.kill(firstPid!, 'SIGKILL');
+
+    // The supervisor should notice, back off, respawn, and come back up with a
+    // brand-new process.
+    await vi.waitFor(
+      () => {
+        expect(supervisor.state).toBe('running');
+        expect(supervisor.currentHandle?.pid).not.toBe(firstPid);
+      },
+      { timeout: 15_000, interval: 200 },
+    );
+
+    expect(states).toContain('backoff');
+    expect(supervisor.currentHandle?.pid).toBeGreaterThan(0);
+
+    await supervisor.stop();
+    expect(supervisor.state).toBe('stopped');
+  }, 30_000);
+
+  it('trips to failed after exhausting the restart budget, then manual restart retries', async () => {
+    const states: string[] = [];
+    const supervisor = makeSupervisor({
+      bundlePath: '/nonexistent/agent.cjs',
+      backoffBaseMs: 20,
+      maxRestarts: 2,
+      onStateChange: (status) => states.push(status.state),
+    });
+
+    await supervisor.launch();
+    await vi.waitFor(() => expect(supervisor.state).toBe('failed'), {
+      timeout: 10_000,
+      interval: 50,
+    });
+
+    expect(states).toContain('backoff');
+    expect(supervisor.status().restart?.maxAttempts).toBe(2);
+
+    // Manual "Restart agent" clears the ladder and attempts again (which fails
+    // the same way, but the state machine must re-enter the spawn path).
+    states.length = 0;
+    await supervisor.restart();
+    await vi.waitFor(() => expect(states).toContain('spawning'), { timeout: 5_000, interval: 50 });
+
+    await supervisor.stop();
+  }, 20_000);
+});
+
 describe('killProcessGracefully', () => {
   it('SIGKILLs a child that ignores SIGTERM', async () => {
     const stubborn = spawn(process.execPath, [
