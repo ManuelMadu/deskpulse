@@ -3,21 +3,31 @@ import { app } from 'electron';
 import { AgentClient } from './agent-client.js';
 import { AgentEventConsumer } from './agent-events.js';
 import { resolveAgentBundlePath } from './agent-paths.js';
-import { installAppLifecycle, launchInitialWindow } from './app-lifecycle.js';
+import { installAppLifecycle, launchInitialWindow, openMainWindow } from './app-lifecycle.js';
 import { AgentSupervisor } from './agent-supervisor.js';
 import { forwardAgentEvent } from './event-bridge.js';
+import { HealthState } from './health-state.js';
+import { handleListMonitors } from './ipc/monitors.js';
 import { registerIpcHandlers } from './ipc/register.js';
 import { defaultLogLocations } from './log-locations.js';
 import { PathTokenRegistry } from './path-tokens.js';
+import { TrayController } from './tray.js';
+
+import { monitorWithStatusSchema } from '@deskpulse/contracts';
 
 import type { WindowFactoryOptions } from './windows.js';
+import type { AgentEvent } from '@deskpulse/contracts';
 
 // Security posture (PDD §30) is set here from day one and never relaxed:
 // sandboxed renderer, context isolation, no Node integration, all navigation
 // and window creation denied except the app's own document.
 
+const HYDRATE_INTERVAL_MS = 30_000;
+
 let supervisor: AgentSupervisor | undefined;
 let eventConsumer: AgentEventConsumer | undefined;
+let tray: TrayController | undefined;
+let hydrateTimer: ReturnType<typeof setInterval> | undefined;
 let isQuitting = false;
 
 const windowOptions: WindowFactoryOptions = {
@@ -48,12 +58,6 @@ void app.whenReady().then(() => {
     },
   });
 
-  supervisor.start().catch((error: unknown) => {
-    // Happy-path ticket: a failed start is logged and surfaced via
-    // getAgentStatus; restart/backoff behavior is Phase 7 (PDD §28).
-    console.error('[supervisor] agent failed to start', error);
-  });
-
   const activeSupervisor = supervisor;
   const endpoint = () => {
     const handle = activeSupervisor.currentHandle;
@@ -61,9 +65,56 @@ void app.whenReady().then(() => {
   };
   const client = new AgentClient(endpoint);
   const tokens = new PathTokenRegistry();
+  const listMonitors = handleListMonitors(client);
 
-  // Consume the agent's SSE stream once in Main and fan events to renderers.
-  eventConsumer = new AgentEventConsumer(endpoint, forwardAgentEvent, (level, msg, ctx) =>
+  // Aggregate health, distilled from the same event stream the renderer sees,
+  // drives the tray icon and (Phase 6c) notifications.
+  const health = new HealthState();
+
+  const refreshTray = (): void => tray?.update(health.snapshot());
+  const hydrateTray = async (): Promise<void> => {
+    try {
+      if (health.hydrateMonitors(await listMonitors())) {
+        refreshTray();
+      }
+    } catch {
+      // Agent unavailable — keep the last known snapshot rather than blanking.
+    }
+  };
+  const pauseAllMonitors = async (): Promise<void> => {
+    try {
+      const monitors = await listMonitors();
+      await Promise.all(
+        monitors
+          .filter((monitor) => monitor.enabled)
+          .map((monitor) =>
+            client.patch(`/monitors/${monitor.id}`, { enabled: false }, monitorWithStatusSchema),
+          ),
+      );
+      await hydrateTray();
+    } catch (error) {
+      console.error('[tray] pause all monitors failed', error);
+    }
+  };
+
+  // Create the tray immediately (PDD §13: fast feedback), agent-down until the
+  // supervisor confirms a live agent.
+  tray = new TrayController({
+    onOpen: () => openMainWindow(windowOptions),
+    onPauseAll: () => void pauseAllMonitors(),
+    onQuit: () => app.quit(),
+  });
+  tray.create(health.snapshot());
+
+  // Consume the agent's SSE stream once in Main: forward to renderers AND fold
+  // into the aggregate health that paints the tray.
+  const onAgentEvent = (event: AgentEvent): void => {
+    forwardAgentEvent(event);
+    if (health.ingest(event)) {
+      refreshTray();
+    }
+  };
+  eventConsumer = new AgentEventConsumer(endpoint, onAgentEvent, (level, msg, ctx) =>
     console[level === 'error' ? 'error' : 'log'](`[events] ${msg}`, ctx ?? ''),
   );
   eventConsumer.start();
@@ -80,8 +131,14 @@ void app.whenReady().then(() => {
     windowOptions,
     hasRunningServices: () => !!supervisor && supervisor.state !== 'stopped',
     stopServices: async () => {
+      if (hydrateTimer) {
+        clearInterval(hydrateTimer);
+        hydrateTimer = undefined;
+      }
       eventConsumer?.stop();
       await supervisor?.stop();
+      tray?.destroy();
+      tray = undefined;
     },
     isQuitting: () => isQuitting,
     setQuitting: (value) => {
@@ -93,10 +150,34 @@ void app.whenReady().then(() => {
       // The renderer re-polls /system on its own 2 s timer once visible.
       eventConsumer?.stop();
       eventConsumer?.start();
+      void hydrateTray();
     },
     log: (level, msg, ctx) =>
       console[level === 'error' ? 'error' : 'log'](`[lifecycle] ${msg}`, ctx ?? ''),
   });
 
   launchInitialWindow(windowOptions);
+
+  supervisor
+    .start()
+    .then(() => {
+      // The agent is alive: reflect it in the tray and seed the monitor list.
+      if (health.setAgentUp(true)) {
+        refreshTray();
+      }
+      void hydrateTray();
+    })
+    .catch((error: unknown) => {
+      // Happy-path ticket: a failed start is logged and surfaced via
+      // getAgentStatus; restart/backoff behavior is Phase 7 (PDD §28).
+      console.error('[supervisor] agent failed to start', error);
+      if (health.setAgentUp(false)) {
+        refreshTray();
+      }
+    });
+
+  // Periodically reconcile the tray's monitor list so removed/renamed monitors
+  // and states settle even without a transition event.
+  hydrateTimer = setInterval(() => void hydrateTray(), HYDRATE_INTERVAL_MS);
+  hydrateTimer.unref();
 });
