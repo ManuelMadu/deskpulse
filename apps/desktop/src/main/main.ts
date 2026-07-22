@@ -1,4 +1,4 @@
-import { app } from 'electron';
+import { Notification, app } from 'electron';
 
 import { AgentClient } from './agent-client.js';
 import { AgentEventConsumer } from './agent-events.js';
@@ -10,13 +10,31 @@ import { HealthState } from './health-state.js';
 import { handleListMonitors } from './ipc/monitors.js';
 import { registerIpcHandlers } from './ipc/register.js';
 import { defaultLogLocations } from './log-locations.js';
+import { MonitorNotifier } from './notifications.js';
 import { PathTokenRegistry } from './path-tokens.js';
 import { TrayController } from './tray.js';
+import { getMainWindow } from './windows.js';
 
-import { monitorWithStatusSchema } from '@deskpulse/contracts';
+import { IPC_CHANNELS, monitorWithStatusSchema } from '@deskpulse/contracts';
 
+import type { Presenter } from './notifications.js';
 import type { WindowFactoryOptions } from './windows.js';
 import type { AgentEvent } from '@deskpulse/contracts';
+
+/**
+ * Present a native banner (PDD §13/§25). On unsigned dev builds macOS
+ * attributes these to "Electron" and may require enabling notifications in
+ * System Settings — documented in the README; signed builds attribute
+ * correctly.
+ */
+const electronPresenter: Presenter = ({ title, body }) => {
+  if (!Notification.isSupported()) {
+    return { onClick: () => undefined };
+  }
+  const notification = new Notification({ title, body });
+  notification.show();
+  return { onClick: (handler) => notification.on('click', handler) };
+};
 
 // Security posture (PDD §30) is set here from day one and never relaxed:
 // sandboxed renderer, context isolation, no Node integration, all navigation
@@ -27,6 +45,7 @@ const HYDRATE_INTERVAL_MS = 30_000;
 let supervisor: AgentSupervisor | undefined;
 let eventConsumer: AgentEventConsumer | undefined;
 let tray: TrayController | undefined;
+let notifier: MonitorNotifier | undefined;
 let hydrateTimer: ReturnType<typeof setInterval> | undefined;
 let isQuitting = false;
 
@@ -97,6 +116,21 @@ void app.whenReady().then(() => {
     }
   };
 
+  // Raise the window and jump to the Monitors screen (notification click).
+  const navigateToMonitors = (): void => {
+    openMainWindow(windowOptions);
+    const window = getMainWindow();
+    if (!window) {
+      return;
+    }
+    const send = (): void => window.webContents.send(IPC_CHANNELS.navigate, 'monitors');
+    if (window.webContents.isLoading()) {
+      window.webContents.once('did-finish-load', send);
+    } else {
+      send();
+    }
+  };
+
   // Create the tray immediately (PDD §13: fast feedback), agent-down until the
   // supervisor confirms a live agent.
   tray = new TrayController({
@@ -106,10 +140,18 @@ void app.whenReady().then(() => {
   });
   tray.create(health.snapshot());
 
+  // Native monitor notifications, driven from Main (PDD §25): transition-only,
+  // bursts coalesced, clicks routed to Monitors.
+  notifier = new MonitorNotifier({
+    present: electronPresenter,
+    onActivate: navigateToMonitors,
+  });
+
   // Consume the agent's SSE stream once in Main: forward to renderers AND fold
-  // into the aggregate health that paints the tray.
+  // into the aggregate health that paints the tray and fires notifications.
   const onAgentEvent = (event: AgentEvent): void => {
     forwardAgentEvent(event);
+    notifier?.handleEvent(event);
     if (health.ingest(event)) {
       refreshTray();
     }
@@ -136,6 +178,8 @@ void app.whenReady().then(() => {
         hydrateTimer = undefined;
       }
       eventConsumer?.stop();
+      notifier?.dispose();
+      notifier = undefined;
       await supervisor?.stop();
       tray?.destroy();
       tray = undefined;

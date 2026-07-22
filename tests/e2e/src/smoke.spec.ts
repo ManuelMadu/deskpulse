@@ -128,6 +128,18 @@ test('packaged app boots sandboxed, supervises the agent, and quits without orph
     await app.evaluate(({ app: electronApp }) => electronApp.emit('activate'));
     await expect.poll(isWindowVisible, { timeout: 5_000 }).toBe(true);
 
+    // Notification click routing (PDD §25): the banner itself can't be
+    // automated, but Main's navigate push — the exact effect of a click — can.
+    // Sending it must switch the renderer to the Monitors screen.
+    await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()[0]?.webContents.send('deskpulse:navigate', 'monitors'),
+    );
+    await expect(window.getByRole('button', { name: 'Monitors' })).toHaveAttribute(
+      'aria-current',
+      'page',
+      { timeout: 5_000 },
+    );
+
     // Quit through the real quit path (before-quit stops the agent).
     await app.evaluate(({ app: electronApp }) => electronApp.quit());
     await waitUntil(() => agentProcessPids().length === 0, 10_000, 'agent teardown on quit');

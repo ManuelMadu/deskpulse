@@ -23,9 +23,18 @@ export const IPC_CHANNELS = {
   monitorsRemove: 'deskpulse:monitors:remove',
   /** Single event fan-out channel (agent SSE events, forwarded by Main). */
   event: 'deskpulse:event',
+  /** Main→renderer navigation push (e.g. a notification click, PDD §25). */
+  navigate: 'deskpulse:navigate',
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
+
+/**
+ * Screens Main can ask the renderer to show (PDD §25 notification click
+ * routing). Kept in lockstep with the renderer's Screen union.
+ */
+export const navigationTargetSchema = z.enum(['dashboard', 'logs', 'monitors']);
+export type NavigationTarget = z.infer<typeof navigationTargetSchema>;
 
 /**
  * Every invoke resolves to this union — never a bare rejection, because

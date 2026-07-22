@@ -70,6 +70,10 @@ export function App(): ReactElement {
     return api.onAgentEvent(route);
   }, [ingestLog, ingestMonitor]);
 
+  // Main can steer the renderer to a screen (PDD §25): a notification click
+  // raises the window and jumps to Monitors.
+  useEffect(() => api.onNavigate((target) => setScreen(target)), []);
+
   return (
     <div className="shell">
       <div className="drag-strip" aria-hidden="true" />

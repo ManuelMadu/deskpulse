@@ -6,6 +6,7 @@ import type {
   AgentStatus,
   IpcResult,
   MonitorWithStatus,
+  NavigationTarget,
   ProcessQuery,
   ProcessesResponse,
   RecentFile,
@@ -51,4 +52,6 @@ export const api = {
     unwrap(window.deskPulse.removeMonitor(input)),
   onAgentEvent: (callback: (event: AgentEvent) => void): (() => void) =>
     window.deskPulse.onAgentEvent(callback),
+  onNavigate: (callback: (target: NavigationTarget) => void): (() => void) =>
+    window.deskPulse.onNavigate(callback),
 };

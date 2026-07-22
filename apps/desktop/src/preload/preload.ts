@@ -4,6 +4,7 @@ import {
   agentStatusSchema,
   ipcFailureSchema,
   monitorWithStatusSchema,
+  navigationTargetSchema,
   processQuerySchema,
   processesResponseSchema,
   recentFileSchema,
@@ -20,6 +21,7 @@ import type {
   AgentStatus,
   IpcResult,
   MonitorWithStatus,
+  NavigationTarget,
   ProcessQuery,
   ProcessesResponse,
   RecentFile,
@@ -91,6 +93,8 @@ export interface DeskPulseTransport {
   removeMonitor(input: RemoveMonitorInput): Promise<IpcResult<void>>;
   /** Subscribe to forwarded agent events; returns an unsubscribe function. */
   onAgentEvent(callback: (event: AgentEvent) => void): () => void;
+  /** Subscribe to Main-initiated screen navigation (e.g. notification click). */
+  onNavigate(callback: (target: NavigationTarget) => void): () => void;
 }
 
 const transport: DeskPulseTransport = {
@@ -132,6 +136,17 @@ const transport: DeskPulseTransport = {
     };
     ipcRenderer.on(IPC_CHANNELS.event, listener);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.event, listener);
+  },
+
+  onNavigate: (callback) => {
+    const listener = (_event: IpcRendererEvent, payload: unknown): void => {
+      const parsed = navigationTargetSchema.safeParse(payload);
+      if (parsed.success) {
+        callback(parsed.data);
+      }
+    };
+    ipcRenderer.on(IPC_CHANNELS.navigate, listener);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.navigate, listener);
   },
 };
 

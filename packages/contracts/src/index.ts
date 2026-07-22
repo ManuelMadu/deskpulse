@@ -99,7 +99,9 @@ export {
   ipcErr,
   ipcFailureSchema,
   ipcOk,
+  navigationTargetSchema,
   type AgentStatus,
   type IpcChannel,
   type IpcResult,
+  type NavigationTarget,
 } from './ipc.js';
