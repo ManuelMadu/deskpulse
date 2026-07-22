@@ -29,12 +29,24 @@ before any release. Items marked ⏳ have no implementation yet.
 - [ ] Pause a monitor → chip shows Paused, probing stops; Resume restarts it.
 - [ ] Add/edit sheet rejects a non-loopback URL and out-of-range interval inline.
 
+## Phase 6 — Menu-bar lifecycle & notifications (M4)
+
+- [ ] Close (red button / ⌘W) hides the window; app stays in menu bar with the agent running.
+- [ ] Dock click and tray "Open DeskPulse" both restore and focus the same window.
+- [ ] Menu-bar icon shows the three states — nominal, degraded (a monitor unhealthy or a
+      watched log errored), agent-down — and stays legible on a light **and** dark menu bar.
+- [ ] Tray dropdown lists status, up to five monitors + "n more…", and "Pause all monitors" works.
+- [ ] A monitor going unhealthy fires exactly one notification (after `failureThreshold` fails);
+      recovery fires one; a wake-induced burst (>3 in 5 s) collapses to one summary banner.
+- [ ] Clicking a notification raises the window on the Monitors screen.
+- [ ] Unsigned-build caveat holds: banners attribute to "Electron" and may need enabling in
+      System Settings › Notifications (matches the README note).
+- [ ] Settings › "Open DeskPulse at login" survives a real logout/login; the login start comes
+      up hidden (menu-bar only); the toggle reflects the OS value after an external change.
+- [ ] Sleep the machine, wake it: metrics/health refresh promptly (no ~45 s stale gap).
+
 ## Later phases (placeholders, filled in as features land)
 
-- ⏳ Menu-bar icon states (nominal / degraded / agent-down), light & dark menu bar (Phase 6)
-- ⏳ Notification appearance + click routing; unsigned-build attribution caveat (Phase 6)
-- ⏳ Launch-at-login across a real logout/login, hidden launch respected (Phase 6)
-- ⏳ Close ≠ quit; Dock click and tray "Open DeskPulse" restore the window (Phase 6)
 - ⏳ ⌘Q during a diagnostic export prompts once (Phase 8)
 - ⏳ `kill -9` of Main leaves no orphan agent (ppid self-check) (Phase 7)
 - ⏳ Dark mode across all five screens (Phase 10)

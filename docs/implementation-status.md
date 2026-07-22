@@ -5,12 +5,14 @@ where the build actually is.
 
 ## Current phase
 
-**Phase 5 — Service health monitoring — COMPLETE** (PDD §37). Monitors ping local
-services on independent schedules, flip a threshold-gated state machine, and drive
-native-notification-ready `monitor.*` events through to a live status table. Next up is
-Phase 6 (menu-bar lifecycle + notifications → milestone M4).
+**Phase 6 — Menu-bar lifecycle & notifications — COMPLETE** (PDD §13/§16/§25). DeskPulse
+is now a resident menu-bar app: closing the window hides it (agent keeps running), the
+tray icon reflects three health states, monitor transitions fire coalesced native
+notifications whose click opens Monitors, and launch-at-login is toggleable from a new
+Settings screen. **Milestone M4 reached.** Next up is Phase 7 (agent crash recovery →
+milestone M5-ish).
 
-Phases 0–5 complete locally. Phase 0's "CI green on PR" criterion remains outstanding
+Phases 0–6 complete locally. Phase 0's "CI green on PR" criterion remains outstanding
 until the GitHub remote exists (see Blocked items).
 
 ## Completed tickets
@@ -30,11 +32,12 @@ until the GitHub remote exists (see Blocked items).
 
 | P3-UI | Dashboard UI: React 19 + Zustand + hand-rolled visibility-aware `usePolling` (2 s, zero traffic while hidden, FR-3); sidebar shell + agent status pill (dot + words, never color alone); CPU big numeral + per-core threshold-tinted bars, memory bar with "approx. used" caveat, host facts; server-sorted process table (`aria-sort`); honest NOT_READY/error/retry states; design system in PRODUCT.md/DESIGN.md (OKLCH amber-tinted neutrals, light+dark, reduced-motion) | 8 formatter/threshold unit tests; packaged E2E: pill, CPU %, process rows, no orphans (8.8 s) |
 | P4-a…g | **Phase 4 log watching** (7 tasks): SSE event union + watch/logs-IPC contracts; agent EventBus (500-event replay ring, monotonic ids) + `GET /events` (heartbeat, Last-Event-ID replay, `stream.reset`, drop-then-close backpressure, 2-connection cap) + UUIDv7; **Tailer** §24 state machine (open-fd offset reads, inode+device identity, dir watch + 1 s poll; append/truncate/rotate/delete/EACCES; raw-byte encoding-safe LineSplitter, 32 KiB cap, 500 lines/s rate cap); `WatchRegistry` + `POST/DELETE /watch` (5-watch limit, errno→envelope); Main `AgentEventConsumer` (1→10 s reconnect, 45 s staleness, frame validation) + event bridge; path-token registry + native dialog + MRU (renderer never sees a real path); Logs UI (virtualized 5,000-line ring buffer, auto-scroll pin, filter, inline markers, drop notice, ANSI-stripped text-only) | **77 new tests** across the layers; the full filesystem suite (append, backfill+1 MiB cap, monotonic offsets, truncate, logrotate rename+recreate with zero lost lines, delete+recreate, window expiry, 32 KiB capping, 10k-line flood accounting, permissions); SSE + /watch integration over real streams; packaged **E2E flow 2** (open temp log → append → visible ≤ 5 s → no orphan) |
+| P6-a…d | **Phase 6 menu-bar lifecycle & notifications** (4 tasks): hide-on-close lifecycle (`windows.ts` create/reveal + close→hide guard; `app-lifecycle.ts` activate-reveals, `window-all-closed` no-quit, sleep-resume SSE reconnect, hidden login-item launch, quit orchestration); menu-bar `Tray` with three template-image states (nominal / degraded / agent-down, silhouette-distinguished so macOS tints them) + dropdown (status line, ≤5 monitors + "n more…", Open / Pause all / Quit), driven by a pure `HealthState` distilled from the forwarded event stream and a pure `tray-model`; native monitor notifications from Main (pure `NotificationPolicy`: transition-only + >3-in-5 s coalescing; `MonitorNotifier` with injected presenter; click routes to Monitors via a new typed Main→renderer `navigate` channel); launch-at-login (`LaunchAtLoginController` over an injected login-item gateway, OS read-back is truth) + settings IPC + live Settings screen | **34 new tests** (health-state derivation, tray-model wording/overflow, notification-policy fake-clock coalescing, notifier wiring + click routing, launch-at-login incl. MDM refusal, navigation + settings contracts); packaged **smoke flow extended**: close hides window while the agent survives, activate reveals it, a `navigate` push switches to Monitors, and the Settings toggle hydrates from Main |
 | P5-a…e | **Phase 5 health monitoring** (5 tasks): monitor config/patch/status + `monitor.*` event contracts with loopback-only URL validation (regex, no URL global; rejects userinfo/subdomain bypasses); pure `MonitorStateMachine` (threshold-gated transitions); `probeOnce` (undici + hard abort, ≤ 4 KiB drain, no redirects, failure classification); `HealthRegistry` (per-monitor scheduler, 0-2 s jitter, overlap-skip → warning, 100-result history, 20-monitor cap, reset on url/method/status change); `GET/POST/PATCH/DELETE /monitors`; monitors IPC + AgentClient `patch`; monitors store (snapshot + `monitor.*` incremental, unknown→healthy on first ok); Monitors UI (status chip, latency, last-checked, 20-tick sparkline, pause/edit/delete, add/edit sheet validating via the contract schema itself) | **50 new tests**: full FR-11 transition matrix, probe classification (ok/unexpected-status/connection-refused/timeout) vs a mode-switch fixture, unhealthy-after-exactly-threshold + recovery, slow-monitor independence, overlap warning, CRUD matrix + limit + reset, store ingestion; packaged **E2E flow 3** (add monitor → fail service → Unhealthy chip → restore → Healthy chip → no orphan) |
 
 ## Active ticket
 
-**Phase 6 — Menu-bar lifecycle and notifications** (tray icon states, hide-on-close, launch-at-login, native notifications on monitor transitions → milestone M4). Manual sanity vs Activity Monitor (M2) and scripted tailing demo (M3) still to be run by hand.
+**Phase 7 — Agent crash recovery** (supervised restart with backoff, config re-push/reconciliation on reconnect, orphan-agent self-check → UC6). Manual sanity vs Activity Monitor (M2), scripted tailing demo (M3), and the Phase 6 macOS items (tray appearance, real login item, notification center) still to be run by hand.
 
 ## Blocked items
 
@@ -109,6 +112,25 @@ and continuous tailing with zero lost lines in the fs test.
 - E2E flow 2 ✅ (open temp log → append → visible in viewer → no orphan)
 - **M3 (Trustworthy tailing) reached.** 162 unit/integration tests + 2 packaged E2E flows green.
 - Remaining by hand: scripted rotate/truncate/delete demo against the live UI (manual checklist).
+
+Phase 6 "done when" (M4): window close leaves a tray-resident app, activate restores it, a
+monitor going unhealthy fires exactly one notification (after `failureThreshold` fails)
+whose click opens Monitors, and recovery fires one notification.
+
+- Hide-on-close + activate-restore ✅ (packaged smoke asserts close hides the window, the
+  agent survives, activate reveals it; `window-all-closed` no longer quits on darwin)
+- Tray with three template-image states + dropdown ✅ (pure `HealthState`/`tray-model`
+  unit-tested; wired to the same forwarded event stream the renderer consumes)
+- Transition-only notifications + coalescing ✅ (pure `NotificationPolicy` fake-clock tests:
+  ≤3 fire individually, >3-in-5 s → one summary; notifier click routes to Monitors)
+- Notification click routing ✅ (typed Main→renderer `navigate` channel; smoke drives the
+  push directly and asserts the renderer switches to Monitors)
+- Launch-at-login ✅ (OS-read-back controller unit-tested; live Settings toggle, smoke
+  confirms it hydrates from Main)
+- **M4 (Resident menu-bar app) reached.** ~229 unit/integration tests + 3 packaged E2E flows green.
+- Remaining by hand (macOS-only, not automatable): tray legibility on light/dark bars, real
+  notification appearance + unsigned "Electron" attribution, login item across a real
+  logout/login with hidden start, sleep/wake refresh (manual checklist).
 
 ## Commands used to verify
 
