@@ -2,6 +2,7 @@ import {
   IPC_CHANNELS,
   agentEventSchema,
   agentStatusSchema,
+  appSettingsSchema,
   ipcFailureSchema,
   monitorWithStatusSchema,
   navigationTargetSchema,
@@ -19,6 +20,7 @@ import type {
   AddMonitorInput,
   AgentEvent,
   AgentStatus,
+  AppSettings,
   IpcResult,
   MonitorWithStatus,
   NavigationTarget,
@@ -27,6 +29,7 @@ import type {
   RecentFile,
   RemoveMonitorInput,
   SelectedFile,
+  SetLaunchAtLoginInput,
   StartLogWatchInput,
   StopLogWatchInput,
   SystemSummary,
@@ -91,6 +94,8 @@ export interface DeskPulseTransport {
   addMonitor(input: AddMonitorInput): Promise<IpcResult<MonitorWithStatus>>;
   updateMonitor(input: UpdateMonitorInput): Promise<IpcResult<MonitorWithStatus>>;
   removeMonitor(input: RemoveMonitorInput): Promise<IpcResult<void>>;
+  getSettings(): Promise<IpcResult<AppSettings>>;
+  setLaunchAtLogin(input: SetLaunchAtLoginInput): Promise<IpcResult<AppSettings>>;
   /** Subscribe to forwarded agent events; returns an unsubscribe function. */
   onAgentEvent(callback: (event: AgentEvent) => void): () => void;
   /** Subscribe to Main-initiated screen navigation (e.g. notification click). */
@@ -124,6 +129,9 @@ const transport: DeskPulseTransport = {
   addMonitor: (input) => invoke(IPC_CHANNELS.monitorsAdd, monitorWithStatusSchema, input),
   updateMonitor: (input) => invoke(IPC_CHANNELS.monitorsUpdate, monitorWithStatusSchema, input),
   removeMonitor: (input) => invoke(IPC_CHANNELS.monitorsRemove, z.void(), input),
+  getSettings: () => invoke(IPC_CHANNELS.settingsGet, appSettingsSchema),
+  setLaunchAtLogin: (input) =>
+    invoke(IPC_CHANNELS.settingsSetLaunchAtLogin, appSettingsSchema, input),
 
   onAgentEvent: (callback) => {
     const listener = (_event: IpcRendererEvent, payload: unknown): void => {

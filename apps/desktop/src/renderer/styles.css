@@ -893,3 +893,48 @@ button {
   opacity: 0.5;
   cursor: default;
 }
+
+/* Settings screen (PDD §13): one quiet setting row per group, data-forward. */
+.setting-group {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-inset);
+}
+
+.setting-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  cursor: pointer;
+}
+
+.setting-row input[type='checkbox'] {
+  margin-top: 2px;
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+}
+
+.setting-row input[type='checkbox']:disabled {
+  cursor: default;
+}
+
+.setting-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.setting-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.setting-caveat {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink-secondary);
+  max-width: 46ch;
+}

@@ -26,10 +26,12 @@ import {
   monitorsInputSchemas,
 } from './monitors.js';
 import { isTrustedSenderUrl } from './sender-check.js';
+import { handleGetSettings, handleSetLaunchAtLogin, settingsInputSchemas } from './settings.js';
 
 import type { AgentClient } from '../agent-client.js';
 import type { AgentSupervisor } from '../agent-supervisor.js';
 import type { PathTokenRegistry } from '../path-tokens.js';
+import type { LaunchAtLoginController } from '../platform/launch-at-login.js';
 import type { AgentStatus, IpcResult } from '@deskpulse/contracts';
 import type { IpcMainInvokeEvent } from 'electron';
 import type { ZodType } from 'zod';
@@ -93,6 +95,7 @@ export function registerIpcHandlers(deps: {
   supervisor: AgentSupervisor;
   client: AgentClient;
   tokens: PathTokenRegistry;
+  launchAtLogin: LaunchAtLoginController;
   defaultLogLocations: string[];
   devServerUrl: string | undefined;
 }): void {
@@ -156,5 +159,18 @@ export function registerIpcHandlers(deps: {
     deps.devServerUrl,
     monitorsInputSchemas.remove,
     handleRemoveMonitor(deps.client),
+  );
+
+  handle(
+    IPC_CHANNELS.settingsGet,
+    deps.devServerUrl,
+    noInput,
+    handleGetSettings(deps.launchAtLogin),
+  );
+  handle(
+    IPC_CHANNELS.settingsSetLaunchAtLogin,
+    deps.devServerUrl,
+    settingsInputSchemas.setLaunchAtLogin,
+    handleSetLaunchAtLogin(deps.launchAtLogin),
   );
 }

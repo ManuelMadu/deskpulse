@@ -6,6 +6,7 @@ import { ProcessTable } from './components/ProcessTable.js';
 import { StatusPill } from './components/StatusPill.js';
 import { LogsScreen } from './components/LogsScreen.js';
 import { MonitorsScreen } from './components/MonitorsScreen.js';
+import { SettingsScreen } from './components/SettingsScreen.js';
 import { useLogsStore } from './logs-store.js';
 import { useMonitorsStore } from './monitors-store.js';
 import { useDashboardStore } from './store.js';
@@ -16,13 +17,10 @@ import type { ReactElement } from 'react';
 
 const REFRESH_INTERVAL_MS = 2_000; // PDD FR-3
 
-type Screen = 'dashboard' | 'logs' | 'monitors';
+type Screen = 'dashboard' | 'logs' | 'monitors' | 'settings';
 
 /** Screens beyond these arrive with their phases (PDD §37). */
-const FUTURE_NAV: { label: string; phase: string }[] = [
-  { label: 'Diagnostics', phase: '8' },
-  { label: 'Settings', phase: '6' },
-];
+const FUTURE_NAV: { label: string; phase: string }[] = [{ label: 'Diagnostics', phase: '8' }];
 
 function Dashboard(): ReactElement {
   const summary = useDashboardStore((s) => s.summary);
@@ -105,6 +103,14 @@ export function App(): ReactElement {
           >
             Monitors
           </button>
+          <button
+            type="button"
+            className="nav-item"
+            aria-current={screen === 'settings' ? 'page' : undefined}
+            onClick={() => setScreen('settings')}
+          >
+            Settings
+          </button>
           {FUTURE_NAV.map(({ label, phase }) => (
             <button
               key={label}
@@ -127,6 +133,7 @@ export function App(): ReactElement {
         {screen === 'dashboard' && <Dashboard />}
         {screen === 'logs' && <LogsScreen />}
         {screen === 'monitors' && <MonitorsScreen />}
+        {screen === 'settings' && <SettingsScreen />}
       </main>
     </div>
   );

@@ -140,6 +140,14 @@ test('packaged app boots sandboxed, supervises the agent, and quits without orph
       { timeout: 5_000 },
     );
 
+    // Settings screen (PDD §13): the launch-at-login toggle hydrates from Main
+    // over the new settings IPC. Assert it loads (becomes enabled) end to end —
+    // deliberately WITHOUT clicking it, which would register a real login item.
+    await window.getByRole('button', { name: 'Settings' }).click();
+    const loginToggle = window.getByTestId('launch-at-login-toggle');
+    await expect(loginToggle).toBeVisible();
+    await expect(loginToggle).toBeEnabled({ timeout: 5_000 });
+
     // Quit through the real quit path (before-quit stops the agent).
     await app.evaluate(({ app: electronApp }) => electronApp.quit());
     await waitUntil(() => agentProcessPids().length === 0, 10_000, 'agent teardown on quit');

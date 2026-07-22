@@ -94,6 +94,12 @@ export {
   type WatchHandle,
 } from './logs-ipc.js';
 export {
+  appSettingsSchema,
+  setLaunchAtLoginInputSchema,
+  type AppSettings,
+  type SetLaunchAtLoginInput,
+} from './settings.js';
+export {
   IPC_CHANNELS,
   agentStatusSchema,
   ipcErr,

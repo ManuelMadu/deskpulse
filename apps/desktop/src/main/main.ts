@@ -12,6 +12,8 @@ import { registerIpcHandlers } from './ipc/register.js';
 import { defaultLogLocations } from './log-locations.js';
 import { MonitorNotifier } from './notifications.js';
 import { PathTokenRegistry } from './path-tokens.js';
+import { electronLoginItemGateway } from './platform/index.js';
+import { LaunchAtLoginController } from './platform/launch-at-login.js';
 import { TrayController } from './tray.js';
 import { getMainWindow } from './windows.js';
 
@@ -165,6 +167,7 @@ void app.whenReady().then(() => {
     supervisor,
     client,
     tokens,
+    launchAtLogin: new LaunchAtLoginController(electronLoginItemGateway),
     defaultLogLocations: defaultLogLocations(),
     devServerUrl: MAIN_WINDOW_VITE_DEV_SERVER_URL || undefined,
   });
