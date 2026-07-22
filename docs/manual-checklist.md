@@ -45,6 +45,16 @@ before any release. Items marked ⏳ have no implementation yet.
       up hidden (menu-bar only); the toggle reflects the OS value after an external change.
 - [ ] Sleep the machine, wake it: metrics/health refresh promptly (no ~45 s stale gap).
 
+## Phase 7 — Agent crash recovery (M5, crash half)
+
+- [ ] `kill -9 <agent-pid>` during an active watch: banner shows the countdown, the agent
+      respawns, the log view shows "— agent restarted, resuming —", and tailing continues.
+- [ ] Monitors survive an agent crash (re-pushed to the fresh agent, state restarts at unknown).
+- [ ] Force ≥ 6 crashes inside 60 s → banner reaches "couldn’t be restarted"; the manual
+      "Restart agent" button brings it back.
+- [ ] `kill -9` of the **Main** process (DeskPulse app) leaves no orphan agent — the agent
+      self-terminates within ~5 s (`pgrep -f agent.cjs` empty). ppid self-check.
+
 ## Later phases (placeholders, filled in as features land)
 
 - ⏳ ⌘Q during a diagnostic export prompts once (Phase 8)
