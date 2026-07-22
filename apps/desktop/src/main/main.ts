@@ -1,16 +1,16 @@
-import path from 'node:path';
-
-import { BrowserWindow, app } from 'electron';
+import { app } from 'electron';
 
 import { AgentClient } from './agent-client.js';
 import { AgentEventConsumer } from './agent-events.js';
 import { resolveAgentBundlePath } from './agent-paths.js';
+import { installAppLifecycle, launchInitialWindow } from './app-lifecycle.js';
 import { AgentSupervisor } from './agent-supervisor.js';
-import { WINDOW_DEFAULTS } from './config.js';
 import { forwardAgentEvent } from './event-bridge.js';
 import { registerIpcHandlers } from './ipc/register.js';
 import { defaultLogLocations } from './log-locations.js';
 import { PathTokenRegistry } from './path-tokens.js';
+
+import type { WindowFactoryOptions } from './windows.js';
 
 // Security posture (PDD §30) is set here from day one and never relaxed:
 // sandboxed renderer, context isolation, no Node integration, all navigation
@@ -20,29 +20,11 @@ let supervisor: AgentSupervisor | undefined;
 let eventConsumer: AgentEventConsumer | undefined;
 let isQuitting = false;
 
-function createWindow(): BrowserWindow {
-  const window = new BrowserWindow({
-    ...WINDOW_DEFAULTS,
-    show: false,
-    titleBarStyle: 'hiddenInset',
-    webPreferences: {
-      sandbox: true,
-      contextIsolation: true,
-      nodeIntegration: false,
-      webSecurity: true,
-      preload: path.join(__dirname, 'preload.js'),
-    },
-  });
-
-  window.once('ready-to-show', () => window.show());
-
-  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    void window.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
-  } else {
-    void window.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
-  }
-  return window;
-}
+const windowOptions: WindowFactoryOptions = {
+  devServerUrl: MAIN_WINDOW_VITE_DEV_SERVER_URL || undefined,
+  rendererName: MAIN_WINDOW_VITE_NAME,
+  isQuitting: () => isQuitting,
+};
 
 app.on('web-contents-created', (_event, contents) => {
   // The renderer never opens windows and never navigates away from the app.
@@ -94,35 +76,27 @@ void app.whenReady().then(() => {
     devServerUrl: MAIN_WINDOW_VITE_DEV_SERVER_URL || undefined,
   });
 
-  createWindow();
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
+  installAppLifecycle({
+    windowOptions,
+    hasRunningServices: () => !!supervisor && supervisor.state !== 'stopped',
+    stopServices: async () => {
+      eventConsumer?.stop();
+      await supervisor?.stop();
+    },
+    isQuitting: () => isQuitting,
+    setQuitting: (value) => {
+      isQuitting = value;
+    },
+    onResume: () => {
+      // Wake from sleep: drop the possibly-dead SSE socket so the consumer
+      // reconnects immediately (its staleness timer might not fire for ~45 s).
+      // The renderer re-polls /system on its own 2 s timer once visible.
+      eventConsumer?.stop();
+      eventConsumer?.start();
+    },
+    log: (level, msg, ctx) =>
+      console[level === 'error' ? 'error' : 'log'](`[lifecycle] ${msg}`, ctx ?? ''),
   });
-});
 
-app.on('before-quit', (event) => {
-  // Quit orchestration (PDD §13/FR-17): stop the agent before exiting so a
-  // packaged quit never leaves an orphan. preventDefault once, stop, re-quit.
-  if (isQuitting || !supervisor || supervisor.state === 'stopped') {
-    return;
-  }
-  event.preventDefault();
-  isQuitting = true;
-  eventConsumer?.stop();
-  void supervisor
-    .stop()
-    .catch((error: unknown) => console.error('[supervisor] stop failed', error))
-    .finally(() => app.quit());
-});
-
-app.on('window-all-closed', () => {
-  // macOS convention — and required here: monitoring continues in the menu
-  // bar (PDD §13). Non-darwin quits; the platform adapter revisits this in
-  // Phase W. Full hide-on-close lifecycle lands in Phase 6.
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  launchInitialWindow(windowOptions);
 });

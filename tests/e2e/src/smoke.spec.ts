@@ -113,6 +113,21 @@ test('packaged app boots sandboxed, supervises the agent, and quits without orph
     // The agent runs as a separate OS process (spawned from Resources/agent.cjs).
     await waitUntil(() => agentProcessPids().length === 1, 15_000, 'agent child process');
 
+    // Menu-bar lifecycle (PDD §13, M4): closing the window HIDES it — the app
+    // stays alive with its agent still running — and reactivation reveals the
+    // same window. Closing must not tear down the agent.
+    const isWindowVisible = (): Promise<boolean> =>
+      app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isVisible() ?? false);
+
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close());
+    await expect.poll(isWindowVisible, { timeout: 5_000 }).toBe(false);
+    // Agent survives a window close (only explicit quit stops it).
+    expect(agentProcessPids().length, 'agent still running after window hide').toBe(1);
+
+    // Reactivation (Dock click / tray "Open DeskPulse") reveals the window.
+    await app.evaluate(({ app: electronApp }) => electronApp.emit('activate'));
+    await expect.poll(isWindowVisible, { timeout: 5_000 }).toBe(true);
+
     // Quit through the real quit path (before-quit stops the agent).
     await app.evaluate(({ app: electronApp }) => electronApp.quit());
     await waitUntil(() => agentProcessPids().length === 0, 10_000, 'agent teardown on quit');
