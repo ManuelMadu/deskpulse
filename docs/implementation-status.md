@@ -5,12 +5,12 @@ where the build actually is.
 
 ## Current phase
 
-**Phase 4 — Log-file watching — COMPLETE** (PDD §37). The project's centerpiece and
-largest budget is done: the Tailer state machine, SSE pipeline, and Logs UI ship with
-the full filesystem suite. **Milestone M3 (Trustworthy tailing) reached.** Next up is
-Phase 5 (service health monitoring).
+**Phase 5 — Service health monitoring — COMPLETE** (PDD §37). Monitors ping local
+services on independent schedules, flip a threshold-gated state machine, and drive
+native-notification-ready `monitor.*` events through to a live status table. Next up is
+Phase 6 (menu-bar lifecycle + notifications → milestone M4).
 
-Phases 0–4 complete locally. Phase 0's "CI green on PR" criterion remains outstanding
+Phases 0–5 complete locally. Phase 0's "CI green on PR" criterion remains outstanding
 until the GitHub remote exists (see Blocked items).
 
 ## Completed tickets
@@ -30,10 +30,11 @@ until the GitHub remote exists (see Blocked items).
 
 | P3-UI | Dashboard UI: React 19 + Zustand + hand-rolled visibility-aware `usePolling` (2 s, zero traffic while hidden, FR-3); sidebar shell + agent status pill (dot + words, never color alone); CPU big numeral + per-core threshold-tinted bars, memory bar with "approx. used" caveat, host facts; server-sorted process table (`aria-sort`); honest NOT_READY/error/retry states; design system in PRODUCT.md/DESIGN.md (OKLCH amber-tinted neutrals, light+dark, reduced-motion) | 8 formatter/threshold unit tests; packaged E2E: pill, CPU %, process rows, no orphans (8.8 s) |
 | P4-a…g | **Phase 4 log watching** (7 tasks): SSE event union + watch/logs-IPC contracts; agent EventBus (500-event replay ring, monotonic ids) + `GET /events` (heartbeat, Last-Event-ID replay, `stream.reset`, drop-then-close backpressure, 2-connection cap) + UUIDv7; **Tailer** §24 state machine (open-fd offset reads, inode+device identity, dir watch + 1 s poll; append/truncate/rotate/delete/EACCES; raw-byte encoding-safe LineSplitter, 32 KiB cap, 500 lines/s rate cap); `WatchRegistry` + `POST/DELETE /watch` (5-watch limit, errno→envelope); Main `AgentEventConsumer` (1→10 s reconnect, 45 s staleness, frame validation) + event bridge; path-token registry + native dialog + MRU (renderer never sees a real path); Logs UI (virtualized 5,000-line ring buffer, auto-scroll pin, filter, inline markers, drop notice, ANSI-stripped text-only) | **77 new tests** across the layers; the full filesystem suite (append, backfill+1 MiB cap, monotonic offsets, truncate, logrotate rename+recreate with zero lost lines, delete+recreate, window expiry, 32 KiB capping, 10k-line flood accounting, permissions); SSE + /watch integration over real streams; packaged **E2E flow 2** (open temp log → append → visible ≤ 5 s → no orphan) |
+| P5-a…e | **Phase 5 health monitoring** (5 tasks): monitor config/patch/status + `monitor.*` event contracts with loopback-only URL validation (regex, no URL global; rejects userinfo/subdomain bypasses); pure `MonitorStateMachine` (threshold-gated transitions); `probeOnce` (undici + hard abort, ≤ 4 KiB drain, no redirects, failure classification); `HealthRegistry` (per-monitor scheduler, 0-2 s jitter, overlap-skip → warning, 100-result history, 20-monitor cap, reset on url/method/status change); `GET/POST/PATCH/DELETE /monitors`; monitors IPC + AgentClient `patch`; monitors store (snapshot + `monitor.*` incremental, unknown→healthy on first ok); Monitors UI (status chip, latency, last-checked, 20-tick sparkline, pause/edit/delete, add/edit sheet validating via the contract schema itself) | **50 new tests**: full FR-11 transition matrix, probe classification (ok/unexpected-status/connection-refused/timeout) vs a mode-switch fixture, unhealthy-after-exactly-threshold + recovery, slow-monitor independence, overlap warning, CRUD matrix + limit + reset, store ingestion; packaged **E2E flow 3** (add monitor → fail service → Unhealthy chip → restore → Healthy chip → no orphan) |
 
 ## Active ticket
 
-**Phase 5 — Service health monitoring** (DP: monitor registry/scheduler/state machine, CRUD endpoints, `monitor.*` events, Monitors UI). Manual sanity vs Activity Monitor (M2) and scripted rotate/truncate/delete demo (M3) still to be run by hand.
+**Phase 6 — Menu-bar lifecycle and notifications** (tray icon states, hide-on-close, launch-at-login, native notifications on monitor transitions → milestone M4). Manual sanity vs Activity Monitor (M2) and scripted tailing demo (M3) still to be run by hand.
 
 ## Blocked items
 
@@ -119,3 +120,7 @@ npm run lint
 node services/system-agent/esbuild.config.mjs  # (from that dir) bundle smoke test
 node services/system-agent/dist/agent.cjs      # prints placeholder handshake JSON
 ```
+
+- **Known flake:** E2E flow 2 (log append visibility) flakes ~1 in 3 and passes on the
+  single retry; targeted for the Phase 10 deflake pass. Flow 3 process-orphan checks now
+  isolate each app instance so sibling-test residue no longer fails a run.

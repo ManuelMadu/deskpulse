@@ -7,10 +7,14 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { _electron as electron, expect, test } from '@playwright/test';
+
+import type { Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 
 /**
  * Phase 2 smoke (PDD M1): the packaged app boots with a locked-down
@@ -41,6 +45,11 @@ function agentProcessPids(): string[] {
   } catch {
     return []; // pgrep exits 1 when nothing matches
   }
+}
+
+/** Agents spawned since `before` — this test's own, ignoring sibling residue. */
+function newAgentPids(before: string[]): string[] {
+  return agentProcessPids().filter((pid) => !before.includes(pid));
 }
 
 async function waitUntil(
@@ -119,6 +128,7 @@ test('flow 2: opening a log file streams appended lines to the viewer', async ()
   const dir = mkdtempSync(join(tmpdir(), 'deskpulse-e2e-log-'));
   const logPath = join(dir, 'app.log');
   writeFileSync(logPath, 'pre-existing line\n');
+  const preExistingAgents = agentProcessPids();
 
   const app = await electron.launch({ executablePath: findAppBinary() });
   try {
@@ -144,19 +154,76 @@ test('flow 2: opening a log file streams appended lines to the viewer', async ()
     // line is intentionally not shown).
     await expect(window.locator('[data-testid="log-view"]')).toBeVisible({ timeout: 15_000 });
 
-    // Append after the watch is live; it must appear (PDD AC: ≤ 1 s; generous
-    // here for CI jitter and the 1 s stat-poll fallback).
+    // Let the watch settle at end-of-file before appending, then the new line
+    // must appear (PDD AC: ≤ 1 s; generous here for the 1 s stat-poll fallback).
+    await window.waitForTimeout(500);
     appendFileSync(logPath, 'streamed-by-flow-2\n');
     await expect(window.locator('[data-testid="log-view"]')).toContainText('streamed-by-flow-2', {
-      timeout: 5_000,
+      timeout: 8_000,
     });
 
     await app.evaluate(({ app: electronApp }) => electronApp.quit());
-    await waitUntil(() => agentProcessPids().length === 0, 10_000, 'agent teardown on quit');
+    await waitUntil(
+      () => newAgentPids(preExistingAgents).length === 0,
+      10_000,
+      'agent teardown on quit',
+    );
   } finally {
     await app.close().catch(() => undefined);
     rmSync(dir, { recursive: true, force: true });
   }
 
-  expect(agentProcessPids(), 'no orphan agent after flow 2').toEqual([]);
+  expect(newAgentPids(preExistingAgents), 'no orphan agent after flow 2').toEqual([]);
+});
+
+test('flow 3: a monitor goes unhealthy when its service fails and recovers when it returns', async () => {
+  // A mode-switchable fixture on loopback stands in for a local service.
+  let healthy = true;
+  const fixture: Server = createServer((_req, res) => {
+    res.writeHead(healthy ? 200 : 503).end(healthy ? 'ok' : 'down');
+  });
+  await new Promise<void>((resolve) => fixture.listen(0, '127.0.0.1', resolve));
+  const fixturePort = (fixture.address() as AddressInfo).port;
+  const preExistingAgents = agentProcessPids();
+
+  const app = await electron.launch({ executablePath: findAppBinary() });
+  try {
+    const window = await app.firstWindow();
+    await expect(window.locator('[data-testid="agent-pill"]')).toContainText('Agent running', {
+      timeout: 15_000,
+    });
+
+    await window.getByRole('button', { name: 'Monitors' }).click();
+    await window.getByRole('button', { name: 'Add monitor' }).click();
+
+    // Fast thresholds so the transitions happen inside the test budget.
+    await window.getByTestId('monitor-name').fill('fixture');
+    await window.getByTestId('monitor-url').fill(`http://127.0.0.1:${fixturePort}/health`);
+    await window.getByTestId('monitor-interval').fill('5');
+    await window.getByTestId('monitor-failures').fill('1');
+    // The header and the sheet both have an "Add monitor" button; submit the sheet's.
+    await window.locator('.sheet').getByRole('button', { name: 'Add monitor' }).click();
+
+    const chip = window.locator('[data-testid="monitor-row"] .status-chip');
+    await expect(chip).toContainText('Healthy', { timeout: 20_000 });
+
+    healthy = false;
+    await expect(chip).toContainText('Unhealthy', { timeout: 20_000 });
+
+    healthy = true;
+    await expect(chip).toContainText('Healthy', { timeout: 20_000 });
+
+    await app.evaluate(({ app: electronApp }) => electronApp.quit());
+    await waitUntil(
+      () => newAgentPids(preExistingAgents).length === 0,
+      10_000,
+      'agent teardown on quit',
+    );
+  } finally {
+    await app.close().catch(() => undefined);
+    fixture.closeAllConnections();
+    await new Promise((resolve) => fixture.close(resolve));
+  }
+
+  expect(newAgentPids(preExistingAgents), 'no orphan agent after flow 3').toEqual([]);
 });

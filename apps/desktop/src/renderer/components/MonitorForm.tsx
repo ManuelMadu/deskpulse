@@ -91,13 +91,22 @@ export function MonitorForm({
 
         <label className="field">
           <span>Name</span>
-          <input value={values.name} onChange={(e) => set('name', e.target.value)} autoFocus />
+          <input
+            data-testid="monitor-name"
+            value={values.name}
+            onChange={(e) => set('name', e.target.value)}
+            autoFocus
+          />
           {issues['name'] && <span className="field-error">{issues['name']}</span>}
         </label>
 
         <label className="field">
           <span>URL (loopback only)</span>
-          <input value={values.url} onChange={(e) => set('url', e.target.value)} />
+          <input
+            data-testid="monitor-url"
+            value={values.url}
+            onChange={(e) => set('url', e.target.value)}
+          />
           {issues['url'] && <span className="field-error">{issues['url']}</span>}
         </label>
 
@@ -112,6 +121,7 @@ export function MonitorForm({
           <label className="field">
             <span>Interval (s)</span>
             <input
+              data-testid="monitor-interval"
               value={values.intervalSeconds}
               onChange={(e) => set('intervalSeconds', e.target.value)}
               inputMode="numeric"
@@ -151,6 +161,7 @@ export function MonitorForm({
           <label className="field">
             <span>Fail after</span>
             <input
+              data-testid="monitor-failures"
               value={values.failureThreshold}
               onChange={(e) => set('failureThreshold', e.target.value)}
               inputMode="numeric"

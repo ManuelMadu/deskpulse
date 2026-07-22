@@ -21,6 +21,14 @@ before any release. Items marked ⏳ have no implementation yet.
 - [ ] A `/var/log` file that yields EACCES shows an inline permission error.
 - [ ] `yes >> app.log` flood keeps the UI responsive; drop counter appears.
 
+## Phase 5 — Service monitoring
+
+- [ ] Add a monitor for a running local service → chip reaches Healthy.
+- [ ] Stop the service → chip flips to Unhealthy after `failureThreshold` probes.
+- [ ] Restart the service → chip returns to Healthy after `recoveryThreshold` probes.
+- [ ] Pause a monitor → chip shows Paused, probing stops; Resume restarts it.
+- [ ] Add/edit sheet rejects a non-loopback URL and out-of-range interval inline.
+
 ## Later phases (placeholders, filled in as features land)
 
 - ⏳ Menu-bar icon states (nominal / degraded / agent-down), light & dark menu bar (Phase 6)
