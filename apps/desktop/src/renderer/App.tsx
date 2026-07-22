@@ -4,6 +4,7 @@ import { api } from './api.js';
 import { Metrics } from './components/Metrics.js';
 import { ProcessTable } from './components/ProcessTable.js';
 import { StatusPill } from './components/StatusPill.js';
+import { CrashBanner } from './components/CrashBanner.js';
 import { LogsScreen } from './components/LogsScreen.js';
 import { MonitorsScreen } from './components/MonitorsScreen.js';
 import { SettingsScreen } from './components/SettingsScreen.js';
@@ -143,6 +144,7 @@ export function App(): ReactElement {
       </aside>
 
       <main className="content">
+        <CrashBanner />
         {screen === 'dashboard' && <Dashboard />}
         {screen === 'logs' && <LogsScreen />}
         {screen === 'monitors' && <MonitorsScreen />}

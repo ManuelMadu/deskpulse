@@ -262,3 +262,75 @@ test('flow 3: a monitor goes unhealthy when its service fails and recovers when 
 
   expect(newAgentPids(preExistingAgents), 'no orphan agent after flow 3').toEqual([]);
 });
+
+test('flow 4: the agent recovers after a crash and log tailing resumes', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'deskpulse-e2e-crash-'));
+  const logPath = join(dir, 'app.log');
+  writeFileSync(logPath, 'pre-existing line\n');
+  const preExistingAgents = agentProcessPids();
+
+  const app = await electron.launch({ executablePath: findAppBinary() });
+  try {
+    const window = await app.firstWindow();
+    await expect(window.locator('[data-testid="agent-pill"]')).toContainText('Agent running', {
+      timeout: 15_000,
+    });
+
+    // Stub the picker (as in flow 2) so the watch is under test, not the dialog.
+    await app.evaluate(({ dialog }, filePath) => {
+      dialog.showOpenDialog = () =>
+        Promise.resolve({ canceled: false, filePaths: [filePath] } as Awaited<
+          ReturnType<typeof dialog.showOpenDialog>
+        >);
+    }, logPath);
+
+    await window.getByRole('button', { name: 'Logs' }).click();
+    await window.getByRole('button', { name: 'Open a log file…' }).click();
+    await expect(window.locator('[data-testid="log-view"]')).toBeVisible({ timeout: 15_000 });
+
+    await window.waitForTimeout(500);
+    appendFileSync(logPath, 'before-crash\n');
+    await expect(window.locator('[data-testid="log-view"]')).toContainText('before-crash', {
+      timeout: 8_000,
+    });
+
+    // Hard-crash the agent (kill -9): no signal reaches it, so only the
+    // supervisor's exit watcher can recover it (PDD §28 / M5).
+    const running = newAgentPids(preExistingAgents);
+    expect(running, 'exactly this test’s agent is running').toHaveLength(1);
+    execFileSync('/bin/kill', ['-9', running[0]!]);
+
+    // Recovery: the supervisor backs off, respawns, and Main re-issues the
+    // watch — the log view shows the restart marker.
+    await expect(window.locator('[data-testid="log-view"]')).toContainText(
+      'agent restarted, resuming',
+      { timeout: 25_000 },
+    );
+
+    // A brand-new agent process is supervising again (the old pid is gone).
+    await waitUntil(
+      () => newAgentPids(preExistingAgents).length === 1,
+      10_000,
+      'agent respawned after crash',
+    );
+
+    // Tailing resumed on the re-issued watch: a fresh append streams through.
+    await window.waitForTimeout(500);
+    appendFileSync(logPath, 'after-recovery\n');
+    await expect(window.locator('[data-testid="log-view"]')).toContainText('after-recovery', {
+      timeout: 15_000,
+    });
+
+    await app.evaluate(({ app: electronApp }) => electronApp.quit());
+    await waitUntil(
+      () => newAgentPids(preExistingAgents).length === 0,
+      10_000,
+      'agent teardown on quit',
+    );
+  } finally {
+    await app.close().catch(() => undefined);
+    rmSync(dir, { recursive: true, force: true });
+  }
+
+  expect(newAgentPids(preExistingAgents), 'no orphan agent after flow 4').toEqual([]);
+});
