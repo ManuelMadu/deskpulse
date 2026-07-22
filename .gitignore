@@ -31,3 +31,6 @@ deskpulse-diagnostics-*.zip
 
 # Logs
 *.log
+
+# Personal, machine-local scratch notes
+*.local.md
