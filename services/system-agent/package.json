@@ -10,9 +10,11 @@
   },
   "dependencies": {
     "@deskpulse/contracts": "*",
+    "archiver": "^6.0.2",
     "pino": "^10.3.1"
   },
   "devDependencies": {
+    "@types/archiver": "^8.0.0",
     "esbuild": "^0.28.1"
   }
 }
