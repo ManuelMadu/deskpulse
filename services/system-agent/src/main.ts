@@ -19,6 +19,7 @@ logging.logger.info({ subsystem: 'lifecycle', version: AGENT_VERSION }, 'agent s
 
 startAgent({
   token,
+  logFilePath: logging.logFilePath,
   onError: (error) =>
     logging.logger.error({ subsystem: 'http', err: String(error) }, 'route handler error'),
 })

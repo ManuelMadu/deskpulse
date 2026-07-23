@@ -23,6 +23,7 @@ export interface WatchRegistryOptions {
  */
 export class WatchRegistry {
   private readonly tailers = new Map<string, Tailer>();
+  private readonly watchPaths = new Map<string, string>();
 
   constructor(
     private readonly bus: EventBus,
@@ -31,6 +32,11 @@ export class WatchRegistry {
 
   get activeCount(): number {
     return this.tailers.size;
+  }
+
+  /** Active watches (id + resolved path) for diagnostic export (PDD §27). */
+  list(): { id: string; path: string }[] {
+    return [...this.watchPaths.entries()].map(([id, path]) => ({ id, path }));
   }
 
   async add(request: StartWatchRequest): Promise<WatchCreated> {
@@ -87,6 +93,7 @@ export class WatchRegistry {
     }
 
     this.tailers.set(id, tailer);
+    this.watchPaths.set(id, realPath);
     return {
       id,
       path: request.path,
@@ -103,6 +110,7 @@ export class WatchRegistry {
       return false;
     }
     this.tailers.delete(id);
+    this.watchPaths.delete(id);
     await tailer.stop();
     return true;
   }
@@ -110,6 +118,7 @@ export class WatchRegistry {
   async closeAll(): Promise<void> {
     const all = [...this.tailers.values()];
     this.tailers.clear();
+    this.watchPaths.clear();
     await Promise.all(all.map((t) => t.stop()));
   }
 }

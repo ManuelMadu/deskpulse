@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
 
+import { LIMITS } from '@deskpulse/contracts';
+
+import { DiagnosticsExporter } from './diagnostics/export.js';
 import { Router } from './http/router.js';
+import { createDiagnosticsExportRoute } from './http/routes/diagnostics.js';
 import { createHealthRoute } from './http/routes/health.js';
 import {
   createCreateMonitorRoute,
@@ -35,6 +39,8 @@ export interface AgentOptions {
   watch?: WatchRegistryOptions;
   /** Test override for monitor scheduling (jitter, interval). */
   health?: HealthRegistryOptions;
+  /** Path to the agent's own log file, included in diagnostic exports (§27). */
+  logFilePath?: string;
 }
 
 export interface AgentInstance extends AgentServer {
@@ -62,6 +68,18 @@ export async function startAgent(options: AgentOptions): Promise<AgentInstance> 
   const sse = createSseHub(bus, { pid: process.pid, version: AGENT_VERSION, runId });
   const watches = new WatchRegistry(bus, options.watch ?? {});
   const monitors = new HealthRegistry(bus, options.health ?? {});
+  const processProvider = createDarwinProcessProvider();
+
+  const exporter = new DiagnosticsExporter({
+    version: AGENT_VERSION,
+    systemSummary: () => sampler.latest(),
+    processes: () =>
+      processProvider.list({ limit: LIMITS.processQueryLimitDefault, sortBy: 'cpu' }),
+    monitors: () => monitors.list(),
+    watches: () => watches.list(),
+    agentLogPath: options.logFilePath ?? '',
+    emit: (event) => bus.publish(event),
+  });
 
   const router = new Router();
   router.add(
@@ -73,7 +91,8 @@ export async function startAgent(options: AgentOptions): Promise<AgentInstance> 
     }),
   );
   router.add('GET', '/system', createSystemRoute(sampler));
-  router.add('GET', '/processes', createProcessesRoute(createDarwinProcessProvider()));
+  router.add('GET', '/processes', createProcessesRoute(processProvider));
+  router.add('POST', '/diagnostics/export', createDiagnosticsExportRoute(exporter));
   router.add('GET', '/events', sse.route);
   router.add('POST', '/watch', createStartWatchRoute(watches));
   router.add('DELETE', '/watch/:id', createStopWatchRoute(watches));

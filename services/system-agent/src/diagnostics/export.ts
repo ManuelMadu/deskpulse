@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { createReadStream, createWriteStream } from 'node:fs';
 import { mkdtemp, rm, stat, statfs } from 'node:fs/promises';
-import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import os from 'node:os';
@@ -20,13 +19,6 @@ import type {
   ProcessesResponse,
   SystemSummary,
 } from '@deskpulse/contracts';
-
-// archiver is a CommonJS `export =` module; require it to sidestep ESM
-// default-interop under verbatimModuleSyntax (types come from @types/archiver).
-const createArchive = createRequire(import.meta.url)('archiver') as (
-  format: string,
-  options?: { zlib?: { level?: number } },
-) => Archiver;
 
 /** DeskPulse's own logs are tailed to the last 5 MiB (PDD §27, FR-21). */
 const AGENT_LOG_TAIL_BYTES = 5 * 1024 * 1024;
@@ -71,6 +63,16 @@ history (Authorization headers, bearer tokens, password/token/secret/api-key
 values, AWS key ids). User-selected logs are NOT redacted — review them before
 sharing this bundle.
 `;
+
+/** archiver is a CJS `export =` callable; loaded via a dynamic import so esbuild
+ * statically bundles it into agent.cjs (a runtime require would not survive
+ * packaging) while the strict base tsconfig stays intact. */
+type ArchiverFactory = (format: string, options?: { zlib?: { level?: number } }) => Archiver;
+
+async function loadArchiver(): Promise<ArchiverFactory> {
+  const mod = (await import('archiver')) as unknown as { default: ArchiverFactory };
+  return mod.default;
+}
 
 async function fileSize(path: string): Promise<number> {
   try {
@@ -167,7 +169,8 @@ export class DiagnosticsExporter {
 
     try {
       emit('collect', 5);
-      const archive = createArchive('zip', { zlib: { level: 9 } });
+      const archiver = await loadArchiver();
+      const archive = archiver('zip', { zlib: { level: 9 } });
       const output = createWriteStream(stagingPath);
       const finished = new Promise<void>((resolve, reject) => {
         output.on('close', resolve);
