@@ -8,7 +8,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { createServer } from 'node:http';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { _electron as electron, expect, test } from '@playwright/test';
@@ -333,4 +333,51 @@ test('flow 4: the agent recovers after a crash and log tailing resumes', async (
   }
 
   expect(newAgentPids(preExistingAgents), 'no orphan agent after flow 4').toEqual([]);
+});
+
+test('flow 5: exporting diagnostics writes a ZIP with a manifest to Downloads', async () => {
+  const downloads = join(homedir(), 'Downloads');
+  const isBundle = (name: string): boolean => name.startsWith('deskpulse-diagnostics-');
+  const before = new Set(readdirSync(downloads).filter(isBundle));
+  const newBundle = (): string | undefined =>
+    readdirSync(downloads).find((name) => isBundle(name) && !before.has(name));
+  const preExistingAgents = agentProcessPids();
+
+  const app = await electron.launch({ executablePath: findAppBinary() });
+  let bundlePath: string | undefined;
+  try {
+    const window = await app.firstWindow();
+    await expect(window.locator('[data-testid="agent-pill"]')).toContainText('Agent running', {
+      timeout: 15_000,
+    });
+
+    await window.getByRole('button', { name: 'Diagnostics' }).click();
+    await window.getByTestId('export-diagnostics').click();
+
+    // The full pipeline (collect → zip → done) runs on the real agent.
+    await expect(window.getByTestId('export-progress')).toHaveAttribute('data-stage', 'done', {
+      timeout: 20_000,
+    });
+
+    // Main moved the finished ZIP to ~/Downloads; it opens with a manifest.
+    await waitUntil(() => newBundle() !== undefined, 10_000, 'diagnostics ZIP in Downloads');
+    bundlePath = join(downloads, newBundle()!);
+    const entries = execFileSync('/usr/bin/unzip', ['-Z1', bundlePath], { encoding: 'utf8' });
+    expect(entries).toContain('manifest.json');
+    expect(entries).toContain('logs/agent.log');
+
+    await app.evaluate(({ app: electronApp }) => electronApp.quit());
+    await waitUntil(
+      () => newAgentPids(preExistingAgents).length === 0,
+      10_000,
+      'agent teardown on quit',
+    );
+  } finally {
+    await app.close().catch(() => undefined);
+    if (bundlePath) {
+      rmSync(bundlePath, { force: true });
+    }
+  }
+
+  expect(newAgentPids(preExistingAgents), 'no orphan agent after flow 5').toEqual([]);
 });

@@ -28,6 +28,9 @@ import {
 import { isTrustedSenderUrl } from './sender-check.js';
 import { handleGetSettings, handleSetLaunchAtLogin, settingsInputSchemas } from './settings.js';
 
+import { handleStartExport } from '../diagnostics.js';
+import { startExportInputSchema } from '@deskpulse/contracts';
+
 import type { AgentConfigStore } from '../agent-config-store.js';
 import type { AgentClient } from '../agent-client.js';
 import type { AgentSupervisor } from '../agent-supervisor.js';
@@ -171,4 +174,11 @@ export function registerIpcHandlers(deps: {
 
   // Manual "Restart agent" (PDD §7/§28): clears the backoff ladder and retries.
   handle(IPC_CHANNELS.agentRestart, deps.devServerUrl, noInput, () => deps.supervisor.restart());
+
+  handle(
+    IPC_CHANNELS.diagnosticsExport,
+    deps.devServerUrl,
+    startExportInputSchema,
+    handleStartExport(deps.client),
+  );
 }

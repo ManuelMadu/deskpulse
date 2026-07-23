@@ -5,9 +5,11 @@ import { Metrics } from './components/Metrics.js';
 import { ProcessTable } from './components/ProcessTable.js';
 import { StatusPill } from './components/StatusPill.js';
 import { CrashBanner } from './components/CrashBanner.js';
+import { DiagnosticsScreen } from './components/DiagnosticsScreen.js';
 import { LogsScreen } from './components/LogsScreen.js';
 import { MonitorsScreen } from './components/MonitorsScreen.js';
 import { SettingsScreen } from './components/SettingsScreen.js';
+import { useDiagnosticsStore } from './diagnostics-store.js';
 import { useLogsStore } from './logs-store.js';
 import { useMonitorsStore } from './monitors-store.js';
 import { useDashboardStore } from './store.js';
@@ -18,10 +20,7 @@ import type { ReactElement } from 'react';
 
 const REFRESH_INTERVAL_MS = 2_000; // PDD FR-3
 
-type Screen = 'dashboard' | 'logs' | 'monitors' | 'settings';
-
-/** Screens beyond these arrive with their phases (PDD §37). */
-const FUTURE_NAV: { label: string; phase: string }[] = [{ label: 'Diagnostics', phase: '8' }];
+type Screen = 'dashboard' | 'logs' | 'monitors' | 'diagnostics' | 'settings';
 
 function Dashboard(): ReactElement {
   const summary = useDashboardStore((s) => s.summary);
@@ -56,6 +55,7 @@ export function App(): ReactElement {
   const remapWatches = useLogsStore((s) => s.remapWatches);
   const ingestMonitor = useMonitorsStore((s) => s.ingest);
   const refreshMonitors = useMonitorsStore((s) => s.refresh);
+  const ingestDiagnostics = useDiagnosticsStore((s) => s.ingest);
 
   // Poll at the shell level so the sidebar agent pill stays live on every
   // screen; the hook pauses entirely while the window is hidden (FR-3).
@@ -67,9 +67,10 @@ export function App(): ReactElement {
     const route = (event: AgentEvent): void => {
       ingestLog(event);
       ingestMonitor(event);
+      ingestDiagnostics(event);
     };
     return api.onAgentEvent(route);
-  }, [ingestLog, ingestMonitor]);
+  }, [ingestLog, ingestMonitor, ingestDiagnostics]);
 
   // Main can steer the renderer to a screen (PDD §25): a notification click
   // raises the window and jumps to Monitors.
@@ -120,23 +121,19 @@ export function App(): ReactElement {
           <button
             type="button"
             className="nav-item"
+            aria-current={screen === 'diagnostics' ? 'page' : undefined}
+            onClick={() => setScreen('diagnostics')}
+          >
+            Diagnostics
+          </button>
+          <button
+            type="button"
+            className="nav-item"
             aria-current={screen === 'settings' ? 'page' : undefined}
             onClick={() => setScreen('settings')}
           >
             Settings
           </button>
-          {FUTURE_NAV.map(({ label, phase }) => (
-            <button
-              key={label}
-              type="button"
-              className="nav-item"
-              disabled
-              title={`Arrives in Phase ${phase}`}
-            >
-              {label}
-              <span className="phase-tag">P{phase}</span>
-            </button>
-          ))}
         </nav>
         <div className="sidebar-foot">
           <StatusPill agent={agent} />
@@ -148,6 +145,7 @@ export function App(): ReactElement {
         {screen === 'dashboard' && <Dashboard />}
         {screen === 'logs' && <LogsScreen />}
         {screen === 'monitors' && <MonitorsScreen />}
+        {screen === 'diagnostics' && <DiagnosticsScreen />}
         {screen === 'settings' && <SettingsScreen />}
       </main>
     </div>

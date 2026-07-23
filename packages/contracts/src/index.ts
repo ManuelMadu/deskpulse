@@ -57,8 +57,10 @@ export {
   MAX_EXTRA_LOG_PATHS,
   exportRequestSchema,
   exportStartedSchema,
+  startExportInputSchema,
   type ExportRequest,
   type ExportStarted,
+  type StartExportInput,
 } from './diagnostics.js';
 export {
   expectedStatusSchema,

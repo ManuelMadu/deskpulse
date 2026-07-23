@@ -24,6 +24,7 @@ export const IPC_CHANNELS = {
   settingsGet: 'deskpulse:settings:get',
   settingsSetLaunchAtLogin: 'deskpulse:settings:set-launch-at-login',
   agentRestart: 'deskpulse:agent:restart',
+  diagnosticsExport: 'deskpulse:diagnostics:export',
   /** Single event fan-out channel (agent SSE events, forwarded by Main). */
   event: 'deskpulse:event',
   /** Main→renderer navigation push (e.g. a notification click, PDD §25). */

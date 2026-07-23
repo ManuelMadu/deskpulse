@@ -32,3 +32,14 @@ export const exportStartedSchema = z.strictObject({
   stagingPath: z.string().min(1),
 });
 export type ExportStarted = z.infer<typeof exportStartedSchema>;
+
+/**
+ * Renderer→Main request to begin an export (PDD §17). Main adds the machine
+ * details (extra log paths, its own log tail) before calling the agent; the
+ * renderer only chooses the toggles.
+ */
+export const startExportInputSchema = z.strictObject({
+  includeHealthHistory: z.boolean(),
+  redactAgentLogs: z.boolean(),
+});
+export type StartExportInput = z.infer<typeof startExportInputSchema>;

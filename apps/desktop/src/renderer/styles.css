@@ -1004,3 +1004,37 @@ button {
 .crash-action:hover {
   background: color-mix(in oklch, var(--fail) 15%, transparent);
 }
+
+/* Diagnostics export progress (PDD §27). */
+.diagnostics-intro {
+  font-size: 12px;
+  color: var(--ink-secondary);
+  max-width: 60ch;
+  margin: 0 0 14px;
+}
+.export-progress {
+  margin-top: 16px;
+}
+.export-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-inset);
+  overflow: hidden;
+}
+.export-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+.export-status {
+  font-size: 12px;
+  color: var(--ink-secondary);
+  margin: 8px 0 0;
+}
+.export-status.ok {
+  color: var(--ok);
+}
+.export-status.fail {
+  color: var(--fail);
+}

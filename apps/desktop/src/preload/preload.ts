@@ -3,6 +3,7 @@ import {
   agentEventSchema,
   agentStatusSchema,
   appSettingsSchema,
+  exportStartedSchema,
   ipcFailureSchema,
   monitorWithStatusSchema,
   navigationTargetSchema,
@@ -22,6 +23,7 @@ import type {
   AgentEvent,
   AgentStatus,
   AppSettings,
+  ExportStarted,
   IpcResult,
   MonitorWithStatus,
   NavigationTarget,
@@ -32,6 +34,7 @@ import type {
   RemoveMonitorInput,
   SelectedFile,
   SetLaunchAtLoginInput,
+  StartExportInput,
   StartLogWatchInput,
   StopLogWatchInput,
   SystemSummary,
@@ -100,6 +103,8 @@ export interface DeskPulseTransport {
   setLaunchAtLogin(input: SetLaunchAtLoginInput): Promise<IpcResult<AppSettings>>;
   /** Ask Main to restart the agent now (manual recovery from `failed`). */
   restartAgent(): Promise<IpcResult<void>>;
+  /** Begin a diagnostic export; progress arrives as diagnostics.progress events. */
+  startExport(input: StartExportInput): Promise<IpcResult<ExportStarted>>;
   /** Subscribe to forwarded agent events; returns an unsubscribe function. */
   onAgentEvent(callback: (event: AgentEvent) => void): () => void;
   /** Subscribe to Main-initiated screen navigation (e.g. notification click). */
@@ -139,6 +144,7 @@ const transport: DeskPulseTransport = {
   setLaunchAtLogin: (input) =>
     invoke(IPC_CHANNELS.settingsSetLaunchAtLogin, appSettingsSchema, input),
   restartAgent: () => invoke(IPC_CHANNELS.agentRestart, z.void()),
+  startExport: (input) => invoke(IPC_CHANNELS.diagnosticsExport, exportStartedSchema, input),
 
   onAgentEvent: (callback) => {
     const listener = (_event: IpcRendererEvent, payload: unknown): void => {

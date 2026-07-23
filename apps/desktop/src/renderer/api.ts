@@ -5,6 +5,7 @@ import type {
   AgentEvent,
   AgentStatus,
   AppSettings,
+  ExportStarted,
   IpcResult,
   MonitorWithStatus,
   NavigationTarget,
@@ -15,6 +16,7 @@ import type {
   RemoveMonitorInput,
   SelectedFile,
   SetLaunchAtLoginInput,
+  StartExportInput,
   StartLogWatchInput,
   StopLogWatchInput,
   SystemSummary,
@@ -57,6 +59,8 @@ export const api = {
   setLaunchAtLogin: (input: SetLaunchAtLoginInput): Promise<AppSettings> =>
     unwrap(window.deskPulse.setLaunchAtLogin(input)),
   restartAgent: (): Promise<void> => unwrap(window.deskPulse.restartAgent()),
+  startExport: (input: StartExportInput): Promise<ExportStarted> =>
+    unwrap(window.deskPulse.startExport(input)),
   onAgentEvent: (callback: (event: AgentEvent) => void): (() => void) =>
     window.deskPulse.onAgentEvent(callback),
   onNavigate: (callback: (target: NavigationTarget) => void): (() => void) =>

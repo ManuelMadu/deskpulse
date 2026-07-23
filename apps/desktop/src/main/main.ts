@@ -1,10 +1,11 @@
-import { Notification, app } from 'electron';
+import { Notification, app, shell } from 'electron';
 
 import { AgentClient } from './agent-client.js';
 import { AgentConfigStore } from './agent-config-store.js';
 import { AgentEventConsumer } from './agent-events.js';
 import { resolveAgentBundlePath } from './agent-paths.js';
 import { reconcileAgentConfig } from './agent-reconciler.js';
+import { finalizeExport } from './diagnostics.js';
 import { installAppLifecycle, launchInitialWindow, openMainWindow } from './app-lifecycle.js';
 import { AgentSupervisor } from './agent-supervisor.js';
 import { forwardAgentEvent } from './event-bridge.js';
@@ -165,6 +166,13 @@ void app.whenReady().then(() => {
     notifier?.handleEvent(event);
     if (health.ingest(event)) {
       refreshTray();
+    }
+    // A finished export ZIP is staged in the agent's temp dir; Main owns moving
+    // it to ~/Downloads and revealing it in Finder (PDD §27).
+    if (event.type === 'diagnostics.progress' && event.stage === 'done' && event.currentItem) {
+      void finalizeExport(event.currentItem, app.getPath('downloads'))
+        .then((dest) => shell.showItemInFolder(dest))
+        .catch((error: unknown) => console.error('[diagnostics] finalize failed', error));
     }
   };
   eventConsumer = new AgentEventConsumer(endpoint, onAgentEvent, (level, msg, ctx) =>
