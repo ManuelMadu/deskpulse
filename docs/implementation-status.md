@@ -5,16 +5,16 @@ where the build actually is.
 
 ## Current phase
 
-**Phase 7 — Agent crash recovery — COMPLETE** (PDD §28). The supervisor grew the full
-§28 state machine: an unexpected agent exit backs off on a 0.5s·2ⁿ ladder (cap 30s), a
-rolling 60s window trips `failed` after too many restarts, and 60s of stable running
-resets the ladder. On recovery Main re-pushes the monitors/watches the stateless new
-agent lost and re-keys the renderer's open log views; a crash-recovery banner shows the
-live countdown and a manual "Restart agent" once exhausted. The agent self-terminates if
-Main dies ungracefully (ppid→1). **Milestone M5's crash half reached.** Next up is
-Phase 8 (diagnostic export → milestone M5 complete).
+**Phase 8 — Diagnostic export — COMPLETE** (PDD §20/§27). A single-flight, streaming
+exporter builds a ZIP (manifest/system/monitors/watches JSON, DeskPulse logs tailed to
+5 MiB and secret-redacted, user logs verbatim tailed to 25 MiB) with byte-weighted
+`diagnostics.progress` events; disk preflight refuses when free < 2× estimate, and any
+failure leaves no staging residue. POST /diagnostics/export drives it; Main moves the
+finished ZIP to ~/Downloads and reveals it in Finder. A Diagnostics screen exposes the
+toggles and a live progress bar. **Milestone M5 complete.** Next up is Phase 9
+(persistence & settings).
 
-Phases 0–7 complete locally, **pushed to GitHub (private), CI green on `main`.**
+Phases 0–8 complete locally, **pushed to GitHub (private), CI green on `main`.**
 
 ## Completed tickets
 
@@ -33,13 +33,14 @@ Phases 0–7 complete locally, **pushed to GitHub (private), CI green on `main`.
 
 | P3-UI | Dashboard UI: React 19 + Zustand + hand-rolled visibility-aware `usePolling` (2 s, zero traffic while hidden, FR-3); sidebar shell + agent status pill (dot + words, never color alone); CPU big numeral + per-core threshold-tinted bars, memory bar with "approx. used" caveat, host facts; server-sorted process table (`aria-sort`); honest NOT_READY/error/retry states; design system in PRODUCT.md/DESIGN.md (OKLCH amber-tinted neutrals, light+dark, reduced-motion) | 8 formatter/threshold unit tests; packaged E2E: pill, CPU %, process rows, no orphans (8.8 s) |
 | P4-a…g | **Phase 4 log watching** (7 tasks): SSE event union + watch/logs-IPC contracts; agent EventBus (500-event replay ring, monotonic ids) + `GET /events` (heartbeat, Last-Event-ID replay, `stream.reset`, drop-then-close backpressure, 2-connection cap) + UUIDv7; **Tailer** §24 state machine (open-fd offset reads, inode+device identity, dir watch + 1 s poll; append/truncate/rotate/delete/EACCES; raw-byte encoding-safe LineSplitter, 32 KiB cap, 500 lines/s rate cap); `WatchRegistry` + `POST/DELETE /watch` (5-watch limit, errno→envelope); Main `AgentEventConsumer` (1→10 s reconnect, 45 s staleness, frame validation) + event bridge; path-token registry + native dialog + MRU (renderer never sees a real path); Logs UI (virtualized 5,000-line ring buffer, auto-scroll pin, filter, inline markers, drop notice, ANSI-stripped text-only) | **77 new tests** across the layers; the full filesystem suite (append, backfill+1 MiB cap, monotonic offsets, truncate, logrotate rename+recreate with zero lost lines, delete+recreate, window expiry, 32 KiB capping, 10k-line flood accounting, permissions); SSE + /watch integration over real streams; packaged **E2E flow 2** (open temp log → append → visible ≤ 5 s → no orphan) |
+| P8-a…e | **Phase 8 diagnostic export** (5 tasks): diagnostics contracts (progress event, export request/response — main-process log passed as a temp-file path, not base64, to respect the 64 KiB body cap) + FR-23 secret redactor (pure per-line filter + chunk-boundary-safe Transform); single-flight streaming `DiagnosticsExporter` (archiver, injected sources, disk preflight → INSUFFICIENT_SPACE, fail→staging-cleanup); POST /diagnostics/export wired into the agent from its live subsystems (archiver dynamic-imported so esbuild bundles it, pinned v6); Main IPC + move-to-Downloads-on-done + Finder reveal; Diagnostics screen (redact/history toggles, live progress) | **44 new tests** (redactor hit/near-miss/split table, exporter build→unzip→entries + redaction + verbatim user log + unreadable→failed-no-residue + disk refusal + single-flight, route 202/401/400 over real HTTP, finalizeExport rename+cleanup, contract round-trips); packaged **E2E flow 5** (Export → progress done → deskpulse-diagnostics-*.zip in Downloads with manifest.json + logs/agent.log → no orphan) |
 | P7-a…d | **Phase 7 agent crash recovery** (4 tasks): supervisor §28 state machine (`launch`/`restart`/exit-watcher over the `start`/`stop` primitives) with a pure, table-tested backoff ladder + rolling-window `failed` rule + stable-running reset, every transition pushed via `onStateChange`; agent ppid orphan self-check (self-terminate when reparented to launchd, injectable + unit-tested); reconciliation — an in-memory `AgentConfigStore` mirrors every monitor/watch IPC write, and on any post-boot `running` the supervisor re-pushes them to the fresh agent and sends the renderer an old→new watch remap (new typed `reconcile` channel) so open log views re-key and keep streaming; crash-recovery banner (live countdown from `AgentStatus.restart.nextRetryAtMs` + manual "Restart agent" via `agent:restart` IPC) | **31 new tests** (backoff/rolling-window table, real-bundle kill→recover + failed-budget→manual-restart integration, orphan-guard transitions, config-store merge, reconciler re-push+remap+best-effort-skip, reconcile/restart contracts); packaged **E2E flow 4** (kill -9 the agent mid-watch → restart marker → new agent supervising → fresh append streams through → no orphan) |
 | P6-a…d | **Phase 6 menu-bar lifecycle & notifications** (4 tasks): hide-on-close lifecycle (`windows.ts` create/reveal + close→hide guard; `app-lifecycle.ts` activate-reveals, `window-all-closed` no-quit, sleep-resume SSE reconnect, hidden login-item launch, quit orchestration); menu-bar `Tray` with three template-image states (nominal / degraded / agent-down, silhouette-distinguished so macOS tints them) + dropdown (status line, ≤5 monitors + "n more…", Open / Pause all / Quit), driven by a pure `HealthState` distilled from the forwarded event stream and a pure `tray-model`; native monitor notifications from Main (pure `NotificationPolicy`: transition-only + >3-in-5 s coalescing; `MonitorNotifier` with injected presenter; click routes to Monitors via a new typed Main→renderer `navigate` channel); launch-at-login (`LaunchAtLoginController` over an injected login-item gateway, OS read-back is truth) + settings IPC + live Settings screen | **34 new tests** (health-state derivation, tray-model wording/overflow, notification-policy fake-clock coalescing, notifier wiring + click routing, launch-at-login incl. MDM refusal, navigation + settings contracts); packaged **smoke flow extended**: close hides window while the agent survives, activate reveals it, a `navigate` push switches to Monitors, and the Settings toggle hydrates from Main |
 | P5-a…e | **Phase 5 health monitoring** (5 tasks): monitor config/patch/status + `monitor.*` event contracts with loopback-only URL validation (regex, no URL global; rejects userinfo/subdomain bypasses); pure `MonitorStateMachine` (threshold-gated transitions); `probeOnce` (undici + hard abort, ≤ 4 KiB drain, no redirects, failure classification); `HealthRegistry` (per-monitor scheduler, 0-2 s jitter, overlap-skip → warning, 100-result history, 20-monitor cap, reset on url/method/status change); `GET/POST/PATCH/DELETE /monitors`; monitors IPC + AgentClient `patch`; monitors store (snapshot + `monitor.*` incremental, unknown→healthy on first ok); Monitors UI (status chip, latency, last-checked, 20-tick sparkline, pause/edit/delete, add/edit sheet validating via the contract schema itself) | **50 new tests**: full FR-11 transition matrix, probe classification (ok/unexpected-status/connection-refused/timeout) vs a mode-switch fixture, unhealthy-after-exactly-threshold + recovery, slow-monitor independence, overlap warning, CRUD matrix + limit + reset, store ingestion; packaged **E2E flow 3** (add monitor → fail service → Unhealthy chip → restore → Healthy chip → no orphan) |
 
 ## Active ticket
 
-**Phase 8 — Diagnostic export** (streaming collect→zip pipeline, redactor, `/diagnostics/export`, progress events, Diagnostics screen, move-to-Downloads → completes milestone M5). Manual sanity vs Activity Monitor (M2), scripted tailing demo (M3), the Phase 6 macOS items (tray appearance, real login item, notification center), and the Phase 7 `kill -9` of _Main_ orphan check still to be run by hand.
+**Phase 9 — Persistence & settings** (atomic JSON store; monitors/settings/MRU/window-state persistence; startup restore → durable config across app restarts, FR-24/25). Manual sanity vs Activity Monitor (M2), scripted tailing demo (M3), the Phase 6 macOS items (tray appearance, real login item, notification center), the Phase 7 `kill -9` of _Main_ orphan check, and the Phase 8 Archive-Utility/redaction spot-check still to be run by hand.
 
 ## Blocked items
 
@@ -147,6 +148,20 @@ after quit; plus a 6th restart in 60s → failed state + working manual restart.
   fresh append streams → no orphan, 6.7 s)
 - **M5's crash half reached.** ~248 unit/integration tests + 4 packaged E2E flows green.
 - Remaining by hand: `kill -9` of _Main_ leaves no orphan agent (ppid self-check, ~5 s).
+
+Phase 8 "done when": the exported ZIP opens in Archive Utility with all documented
+entries; a failed export leaves no temp files.
+
+- Streaming pipeline + all entries ✅ (exporter integration: build → unzip → manifest/
+  system/monitors/watches/README/logs asserted present)
+- Redaction ✅ (FR-23 pattern table; agent log redacted, user log verbatim in the bundle)
+- Failure cleanup ✅ (unreadable extra log → failed event + staging dir gone; disk preflight)
+- HTTP surface ✅ (POST /diagnostics/export 202/401/400 over real sockets)
+- Move-to-Downloads ✅ (finalizeExport rename+cleanup unit-tested; Main reveals in Finder)
+- E2E flow 5 ✅ (packaged: Export → done → deskpulse-diagnostics-\*.zip in Downloads with
+  manifest.json + logs/agent.log → no orphan)
+- **M5 (Resilient) complete.** ~277 unit/integration tests + 5 packaged E2E flows green.
+- Remaining by hand: open a real bundle in Archive Utility and eyeball redaction (checklist).
 
 ## Commands used to verify
 

@@ -55,9 +55,19 @@ before any release. Items marked ⏳ have no implementation yet.
 - [ ] `kill -9` of the **Main** process (DeskPulse app) leaves no orphan agent — the agent
       self-terminates within ~5 s (`pgrep -f agent.cjs` empty). ppid self-check.
 
+## Phase 8 — Diagnostic export (M5)
+
+- [ ] Diagnostics → Export: progress bar runs to done; the ZIP is revealed in Finder.
+- [ ] The bundle opens in Archive Utility with manifest.json, system.json, monitors.json,
+      watches.json, README.txt, and logs/agent.log.
+- [ ] With redaction on, agent.log has secrets masked (`[REDACTED:*]`); an added user log is
+      verbatim (unredacted) — matches the README disclaimer.
+- [ ] Add a large (>25 MiB) user log → it is tail-truncated with a `.TRUNCATED.txt` marker.
+- [ ] A failed export (e.g. remove an added file mid-run) shows a failure and leaves no temp
+      files in the staging dir.
+
 ## Later phases (placeholders, filled in as features land)
 
-- ⏳ ⌘Q during a diagnostic export prompts once (Phase 8)
 - ⏳ `kill -9` of Main leaves no orphan agent (ppid self-check) (Phase 7)
 - ⏳ Dark mode across all five screens (Phase 10)
 - ⏳ Unsigned-build Gatekeeper walkthrough matches README instructions (Phase 11)
