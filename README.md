@@ -26,8 +26,9 @@ Full design: see [docs/DeskPulse-PDD.md](docs/DeskPulse-PDD.md).
 
 ## Status
 
-Phases 0–4 complete (tooling, agent, secure IPC, metrics dashboard, log watching);
-milestone M3 (trustworthy tailing) reached. See
+Phases 0–8 complete (tooling, agent, secure IPC, metrics dashboard, log watching, health
+monitoring, menu-bar lifecycle and notifications, crash recovery, diagnostic export);
+milestone M5 reached. Next up: persistence and settings, then E2E hardening and packaging. See
 [docs/implementation-status.md](docs/implementation-status.md).
 
 ## Requirements
